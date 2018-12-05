@@ -9,8 +9,18 @@ const ControlCall = 2
 const ControlRet = 3
 const ControlExit = 4
 
-function disasm(container, insts) {
+function disasm(container, info) {
+    const insts = info.Insts;
+
+    // Create table.
     const table = $('<table class="disasm">').appendTo($(container).empty());
+
+    // Create table header.
+    const groupHeader = $("<thead>").appendTo(table).
+          append($('<td colspan="4">'));
+    const header = $("<thead>").appendTo(table).
+          append($('<td colspan="4">'));
+    const tableInfo = {table: table, groupHeader: groupHeader, header: header};
 
     // Create a zero-height TD at the top that will contain the
     // control flow arrows SVG.
@@ -28,10 +38,10 @@ function disasm(container, insts) {
         // Create the row. The last TD is to extend the highlight over
         // the arrows SVG.
         const row = $("<tr>").attr("tabindex", -1).
-            append($("<td>").text("0x"+inst.PC.toString(16))).
-            append($("<td>").text(inst.Op)).
-            append($("<td>").append(args)).
-            append($("<td>"));
+              append($("<td>").text("0x"+inst.PC.toString(16))).
+              append($("<td>").text(inst.Op)).
+              append($("<td>").append(args)).
+              append($("<td>")); // Extend the highlight over the arrows SVG
         table.append(row);
 
         const rowMeta = {elt: row, i: rows.length, width: 1, arrows: []};
@@ -148,10 +158,12 @@ function disasm(container, insts) {
                 r2.arrows.push(line);
         }
     }
+
+    // Add liveness.
+    renderLiveness(info, tableInfo, rows);
 }
 
 function formatArgs(args) {
-    console.log("formatArgs",args);
     const elts = [];
     var i = 0;
     for (var arg of args) {
@@ -166,4 +178,107 @@ function formatArgs(args) {
         }
     }
     return $(elts);
+}
+
+function renderLiveness(info, table, rows) {
+    const ptrSize = info.Liveness.PtrSize;
+
+    // Decode live bitmaps.
+    const locals = [], args = [];
+    for (const bm of info.Liveness.Locals)
+        locals.push(parseBitmap(bm));
+    for (const bm of info.Liveness.Args)
+        args.push(parseBitmap(bm));
+
+    // Compute varp/argp and covered range.
+    var liveMin = 0xffffffff;
+    var liveMax = 0;
+    var argMin = 0xffffffff;
+    var argMax = 0;
+    const insts = [];
+    for (let i = 0; i < info.Insts.length; i++) {
+        const spoff = info.Liveness.SPOff[i];
+        insts[i] = {
+            varp: info.Liveness.VarpDelta + spoff,
+            argp: info.Liveness.ArgpDelta + spoff,
+        };
+
+        // SPOff -1 indicates unknown SP offset. SPOff 0 happens at
+        // RET, where we don't bother resetting the liveness index,
+        // but if the frame is 0 bytes, it can't have liveness.
+        if (spoff <= 0)
+            continue;
+
+        const index = info.Liveness.Indexes[i];
+        if (index < 0)
+            continue;
+        if (insts[i].varp > 0) {
+            insts[i].localp = insts[i].varp - locals[index].n * ptrSize;
+            liveMin = Math.min(liveMin, insts[i].localp);
+            liveMax = Math.max(liveMax, insts[i].varp);
+        }
+        if (insts[i].argp > 0) {
+            argMin = Math.min(argMin, insts[i].argp);
+            argMax = Math.max(argMax, insts[i].argp + args[index].n * ptrSize);
+        }
+    }
+    const haveArgs = argMin < argMax;
+
+    // Create table header.
+    if (liveMin < liveMax)
+        table.groupHeader.append($("<th>").text("locals").addClass("flag").attr("colspan", (liveMax - liveMin) / ptrSize));
+    if (haveArgs) {
+        table.groupHeader.append($("<th>"));
+        table.groupHeader.append($("<th>").text("args").addClass("flag").attr("colspan", (argMax - argMin) / ptrSize));
+    }
+
+    for (let i = liveMin; i < liveMax; i += ptrSize)
+        table.header.append($("<th>").text("0x"+i.toString(16)).addClass("flag"));
+    if (haveArgs) {
+        table.header.append($("<th>").text("|").addClass("flag"));
+        for (let i = argMin; i < argMax; i += ptrSize)
+            table.header.append($("<th>").text("0x"+i.toString(16)).addClass("flag"));
+    }
+
+    // Create table cells.
+    for (var i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const index = info.Liveness.Indexes[i];
+        const addBit = function(addr, bitmap, base) {
+            const i = (addr - base) / ptrSize;
+            var text = "";
+            if (bitmap !== undefined && 0 <= i && i < bitmap.n)
+                text = bitmap.bit(i) ? "P" : "-";
+            row.elt.append($("<td>").text(text).addClass("flag"));
+        };
+        for (let addr = liveMin; addr < liveMax; addr += ptrSize)
+            addBit(addr, locals[index], insts[i].localp);
+        if (haveArgs) {
+            row.elt.append($("<td>"));
+            for (let addr = argMin; addr < argMax; addr += ptrSize)
+                addBit(addr, args[index], insts[i].argp);
+        }
+    }
+}
+
+function Bitmap(nbits, bytes) {
+    this.n = nbits;
+    this.bytes = bytes;
+}
+
+Bitmap.prototype.bit = function(n) {
+    if (n < 0 || n >= this.nbits)
+        throw "out of range";
+    return (this.bytes[Math.floor(n/8)]>>(n%8)) & 1;
+};
+
+function parseBitmap(bitmap) {
+    // Parse hex representation.
+    const parts = bitmap.split(":", 2);
+    const nbits = parseInt(parts[0], 10);
+    const bytes = [];
+    for (var i = 0; i < parts[1].length; i += 2) {
+        bytes.push(parseInt(parts[1].substr(i, 2), 16));
+    }
+    return new Bitmap(nbits, bytes);
 }

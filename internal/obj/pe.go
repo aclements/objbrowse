@@ -35,6 +35,10 @@ func openPE(r io.ReaderAt) (Obj, error) {
 	return &peFile{f, imageBase}, nil
 }
 
+func (f *peFile) Data(ptr, size uint64) ([]byte, error) {
+	panic("not implemented")
+}
+
 func (f *peFile) Symbols() ([]Sym, error) {
 	const (
 		IMAGE_SYM_UNDEFINED = 0

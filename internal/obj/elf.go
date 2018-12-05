@@ -22,6 +22,26 @@ func openElf(r io.ReaderAt) (Obj, error) {
 	return &elfFile{f}, nil
 }
 
+func (f *elfFile) Data(ptr, size uint64) ([]byte, error) {
+	// Look up the section containing ptr.
+	//
+	// TODO: This should probably come from the program headers,
+	// not the section headers. Then it's meaningless on an
+	// unlinked object, but that has relocations, so that's
+	// probably meaningless anyway.
+	for _, sect := range f.elf.Sections {
+		end := sect.Addr + sect.Size
+		if sect.Addr <= ptr && ptr < end {
+			// Found it. Limit size.
+			if ptr+size > end {
+				size = end - ptr
+			}
+			return f.sectData(sect, ptr, size)
+		}
+	}
+	return nil, nil
+}
+
 func (f *elfFile) Symbols() ([]Sym, error) {
 	syms, err := f.elf.Symbols()
 	if err != nil {
@@ -61,15 +81,19 @@ func (f *elfFile) Symbols() ([]Sym, error) {
 
 func (f *elfFile) SymbolData(s Sym) ([]byte, error) {
 	sect := f.elf.Sections[s.section]
-	out := make([]byte, s.Size)
 	if s.Value < sect.Addr {
 		return nil, fmt.Errorf("symbol %q starts before section %q", s.Name, sect.Name)
 	}
-	pos := s.Value - sect.Addr
+	return f.sectData(sect, s.Value, s.Size)
+}
+
+func (f *elfFile) sectData(sect *elf.Section, ptr, size uint64) ([]byte, error) {
+	out := make([]byte, size)
+	pos := ptr - sect.Addr
 	if pos >= sect.Size {
 		return out, nil
 	}
-	flen := s.Size
+	flen := size
 	if flen > sect.Size-pos {
 		flen = sect.Size - pos
 	}

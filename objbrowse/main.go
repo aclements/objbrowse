@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/aclements/objbrowse/internal/asm"
+	"github.com/aclements/objbrowse/internal/functab"
 	"github.com/aclements/objbrowse/internal/obj"
 	"github.com/aclements/objbrowse/internal/ssa"
 	"github.com/aclements/objbrowse/internal/symtab"
@@ -40,8 +41,9 @@ func main() {
 }
 
 type state struct {
-	bin    obj.Obj
-	symTab *symtab.Table
+	bin      obj.Obj
+	symTab   *symtab.Table
+	pcToFunc map[uint64]*functab.Func
 }
 
 func open() *state {
@@ -62,7 +64,25 @@ func open() *state {
 
 	symTab := symtab.NewTable(syms)
 
-	return &state{bin, symTab}
+	// Collect function info.
+	pcToFunc := make(map[uint64]*functab.Func)
+	pclntab, ok := symTab.Name("runtime.pclntab")
+	if ok {
+		data, err := bin.SymbolData(pclntab)
+		if err != nil {
+			log.Fatal(err)
+		}
+		funcTab, err := functab.NewFuncTab(data, bin.(obj.Mem))
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, fn := range funcTab.Funcs {
+			pcToFunc[fn.PC] = fn
+
+		}
+	}
+
+	return &state{bin, symTab, pcToFunc}
 }
 
 func (s *state) serve() {
@@ -105,6 +125,12 @@ var tmplMain = template.Must(template.New("").Parse(`
 </body></html>
 `))
 
+type SymInfo struct {
+	Insts []Disasm
+
+	Liveness Liveness
+}
+
 type Disasm struct {
 	PC      uint64
 	Op      string
@@ -116,16 +142,19 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 	// TODO: Highlight sources of data read by instruction and
 	// sinks of data written by instruction.
 
-	// TODO: Show liveness maps at each instruction.
-
 	// TODO: Option to show dot basic block graph with cross-links
-	// to assembly listing? Maybe also dominator tree?
+	// to assembly listing? Maybe also dominator tree? Maybe this
+	// is another parallel view?
 
-	// TODO: Show both source and assembly. Make clicking on one
-	// highlight the corresponding lines in the other.
+	// TODO: Have parallel views of symbols: hex dump,
+	// disassembly, and source. For data symbols, just have hex
+	// dump. Cross-link the views, so clicking on a line of source
+	// highlights all of the assembly for the line and the hex
+	// corresponding to those instructions, etc.
 
 	// TODO: Support for overlaying things like profile
-	// information? (Could also use this for liveness, etc.)
+	// information? (Could also use this for liveness, etc.) Would
+	// be nice if this were "pluggable".
 
 	// TODO: Have a way to navigate control flow, leaving behind
 	// "breadcrumbs" of sequential control flow. E.g., clicking on
@@ -136,7 +165,10 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 	// control flow (and maybe a way to fork, probably just using
 	// browser tabs).
 
-	// TODO: Do something different for data and text symbols.
+	// TODO: Option to re-order assembly so control-flow is more
+	// local. Maybe edge spring model? Or topo order?
+
+	var info SymInfo
 
 	sym, ok := s.symTab.Name(r.URL.Path[3:])
 	if !ok {
@@ -163,18 +195,33 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 		f.Fprint(os.Stdout)
 	}
 
-	var lines []string
+	//var lines []string
 	var disasms []Disasm
 	for i := 0; i < insts.Len(); i++ {
 		inst := insts.Get(i)
 		disasm := inst.GoSyntax(s.symTab.SymName)
 		op, args := parse(disasm)
-		r, w := inst.Effects()
-		lines = append(lines, fmt.Sprintf("%s %x %x", disasm, r, w))
-		disasms = append(disasms, Disasm{inst.PC(), op, args, inst.Control()})
-	}
+		//r, w := inst.Effects()
 
-	if err := tmplSym.Execute(w, disasms); err != nil {
+		//lines = append(lines, fmt.Sprintf("%s %x %x", disasm, r, w))
+		disasms = append(disasms, Disasm{
+			PC:      inst.PC(),
+			Op:      op,
+			Args:    args,
+			Control: inst.Control(),
+		})
+	}
+	info.Insts = disasms
+
+	// Process liveness information.
+	l, err := s.liveness(sym, insts)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	info.Liveness = l
+
+	if err := tmplSym.Execute(w, info); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -205,8 +252,10 @@ var tmplSym = template.Must(template.New("").Parse(`
 <style>
   .disasm { border-spacing: 0; }
   .disasm td { padding: 0 .5em; }
+  .disasm th { padding: 0 .5em; }
   .disasm tr:hover { background: #c6eaff; }
   .disasm tr:focus { background: #75ccff; }
+  .disasm .flag { text-align: center; }
 </style>
 <svg width="0" height="0" viewBox="0 0 0 0">
   <defs>

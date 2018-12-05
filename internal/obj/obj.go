@@ -9,7 +9,17 @@ import (
 	"io"
 )
 
+// Mem represents a sparse memory map.
+type Mem interface {
+	// Data returns the data at ptr in the memory map. If size
+	// exceeds the size of the data at ptr, the result will be
+	// smaller than size. If ptr isn't in the memory map at all,
+	// the result will be nil.
+	Data(ptr, size uint64) ([]byte, error)
+}
+
 type Obj interface {
+	Mem
 	Symbols() ([]Sym, error)
 	SymbolData(s Sym) ([]byte, error)
 }
