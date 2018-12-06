@@ -20,8 +20,33 @@ type Table struct {
 func NewTable(syms []obj.Sym) *Table {
 	// Put syms in address order for fast address lookup.
 	sort.Slice(syms, func(i, j int) bool {
-		return syms[i].Value < syms[j].Value
+		// Put undefined symbols before defined symbols so we
+		// can trim them off.
+		cati, catj := 0, 0
+		if syms[i].Kind == obj.SymUndef {
+			cati = -1
+		}
+		if syms[j].Kind == obj.SymUndef {
+			catj = -1
+		}
+		if cati != catj {
+			return cati < catj
+		}
+
+		// Sort by symbol address.
+		vi, vj := syms[i].Value, syms[j].Value
+		if vi != vj {
+			return vi < vj
+		}
+
+		// Secondary sort by name.
+		return syms[i].Name < syms[j].Name
 	})
+
+	// Trim undefined symbols.
+	for len(syms) > 0 && syms[0].Kind == obj.SymUndef {
+		syms = syms[1:]
+	}
 
 	// Create name map for fast name lookup.
 	name := make(map[string]int)
@@ -50,12 +75,31 @@ func (t *Table) Name(name string) (obj.Sym, bool) {
 func (t *Table) Addr(addr uint64) (obj.Sym, bool) {
 	i := sort.Search(len(t.addr), func(i int) bool {
 		return addr < t.addr[i].Value
-	})
-	if i > 0 {
-		s := t.addr[i-1]
-		if s.Value != 0 && s.Value <= addr && addr < s.Value+s.Size {
-			return s, true
+	}) - 1
+	if i < 0 {
+		return obj.Sym{}, false
+	}
+	// There may be multiple symbols at this address. Pick the
+	// "best" based on some heuristics.
+	best, bestZeroSize := -1, -1
+	for j, sym := range t.addr[i:] {
+		if sym.Value > addr {
+			break
 		}
+		if best == -1 && addr < sym.Value+sym.Size {
+			best = i + j
+		}
+		if bestZeroSize == -1 && sym.Size == 0 {
+			bestZeroSize = i + j
+		}
+	}
+	// Prefer symbols with a size, but take zero-sized symbols if
+	// we must (as long as it's not the last symbol).
+	switch {
+	case best != -1:
+		return t.addr[best], true
+	case bestZeroSize != -1 && bestZeroSize != len(t.addr)-1:
+		return t.addr[bestZeroSize], true
 	}
 	return obj.Sym{}, false
 }

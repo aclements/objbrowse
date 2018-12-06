@@ -171,7 +171,8 @@ function formatArgs(args) {
             elts.push(document.createTextNode(", "));
 
         var r;
-        if (r = /(.*)\(SB\)/.exec(arg)) {
+        if (r = /([^+]*)(\+(0x)?[0-9]+)?\(SB\)/.exec(arg)) {
+            // TODO: Link to offset if there is one.
             elts.push($("<a>").attr("href", "/s/" + r[1]).text(arg)[0]);
         } else {
             elts.push(document.createTextNode(arg))

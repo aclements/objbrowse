@@ -199,6 +199,12 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 	var disasms []Disasm
 	for i := 0; i < insts.Len(); i++ {
 		inst := insts.Get(i)
+		// TODO: Often the address lookups are for type.*,
+		// go.string.*, or go.func.*. These are pretty
+		// useless. We should at least link to the right place
+		// in a hex dump. It would be way better if we could
+		// do something like printing the string or resolving
+		// the pointer in the funcval.
 		disasm := inst.GoSyntax(s.symTab.SymName)
 		op, args := parse(disasm)
 		//r, w := inst.Effects()
