@@ -150,7 +150,9 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 	// disassembly, and source. For data symbols, just have hex
 	// dump. Cross-link the views, so clicking on a line of source
 	// highlights all of the assembly for the line and the hex
-	// corresponding to those instructions, etc.
+	// corresponding to those instructions, etc. Could have
+	// further parallel views, too, like decoding hex values using
+	// DWARF type information.
 
 	// TODO: Support for overlaying things like profile
 	// information? (Could also use this for liveness, etc.) Would
