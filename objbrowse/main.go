@@ -306,6 +306,8 @@ func parse(disasm string) (op string, args []string) {
 var tmplSym = template.Must(template.New("").Parse(`
 <html><body>
 <style>
+  html, body { margin: 0px; padding: 0px; }
+
   body { font-family: sans-serif; }
 
   .highlight { background: #c6eaff; }
@@ -335,10 +337,9 @@ var tmplSym = template.Must(template.New("").Parse(`
     </marker>
   </defs>
 </svg>
-<div id="container"></div>
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
 <script src="/objbrowse.js"></script>
 <script src="/sourceview.js"></script>
-<script>disasm(document.getElementById("container"), {{$}})</script>
+<script>disasm(document.body, {{$}})</script>
 </body></html>
 `))

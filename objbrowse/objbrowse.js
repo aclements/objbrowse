@@ -60,6 +60,39 @@ function compareAddr(a, b) {
     return 0;
 }
 
+class Panels {
+    constructor(container) {
+        this._c = $("<div>").css({position: "relative", height: "100%", display: "flex"});
+        this._c.appendTo(container);
+        this._cols = [];
+    }
+
+    // addCol adds a column to the right and returns a container
+    // element.
+    addCol() {
+        const div = $("<div>").css({
+            overflow: "auto", height: "100%", boxSizing: "border-box",
+            padding: "8px", flex: "1",
+        });
+        if (this._cols.length == 0) {
+            // Create first column.
+        } else {
+            // Create separator.
+            this._c.append(this._newSep());
+        }
+        this._c.append(div);
+        this._cols.push({div: div});
+        return div[0];
+    }
+
+    _newSep() {
+        return $("<div>").css({
+            width: "2px", height: "100%", boxSizing: "border-box",
+            marginRight: "4px", marginLeft: "4px",
+            background: "#888"});
+    }
+}
+
 var disasmTable;
 var disasmRows;
 var disasmPCs; // IntervalMap to row indexes;
@@ -68,9 +101,10 @@ var sourceView;
 
 function disasm(container, info) {
     const insts = info.Insts;
+    const panels = new Panels(container);
 
     // Create table.
-    const table = $('<table class="disasm">').appendTo($(container).empty());
+    const table = $('<table class="disasm">').appendTo(panels.addCol());
     disasmTable = table;
 
     // Create table header.
@@ -175,6 +209,7 @@ function disasm(container, info) {
         const rowHeight = rows[0].elt.height();
         const svgWidth = cols * arrowWidth;
         arrowTD.css({"vertical-align": "top", "width": svgWidth});
+        const arrowDiv = $("<div>").css({position: "relative"}).appendTo(arrowTD);
         const tdTop = arrowTD.offset().top;
         // Create the arrows SVG. This is absolutely positioned so the
         // row highlight in the other TRs can extend over it and has
@@ -182,7 +217,7 @@ function disasm(container, info) {
         arrowSVG = $(document.createElementNS("http://www.w3.org/2000/svg", "svg")).
             attr({height: table.height(), width: svgWidth}).
             css({position: "absolute", "pointer-events": "none"}).
-            appendTo(arrowTD);
+            appendTo(arrowDiv);
         for (var arrow of arrows) {
             const line = $(document.createElementNS("http://www.w3.org/2000/svg", "path"));
             line.appendTo(arrowSVG);
@@ -227,7 +262,7 @@ function disasm(container, info) {
     renderLiveness(info, tableInfo, rows);
 
     // Add source view.
-    sourceView = new SourceView(info.SourceView, container);
+    sourceView = new SourceView(info.SourceView, panels.addCol());
 }
 
 function formatArgs(args) {
