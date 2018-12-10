@@ -9,11 +9,69 @@ const ControlCall = 2
 const ControlRet = 3
 const ControlExit = 4
 
+function highlightRanges(ranges) {
+    disasmHighlightRanges(ranges);
+    sourceView.highlightRanges(ranges);
+}
+
+// IntervalMap is a map of intervals.
+class IntervalMap {
+    // ranges must be an array of [low, high, ...] arrays, where ...
+    // can be any additional data the caller wishes to store.
+    constructor(ranges) {
+        // Sort ranges.
+        ranges.sort((a, b) => compareAddr(a[0], b[0]));
+        this.ranges = ranges;
+    }
+
+    // Intersect a list of ranges with the ranges in this map and
+    // return the subset that overlap. ranges must already be sorted.
+    intersect(ranges) {
+        const out = [];
+        let i = 0, j = 0;
+        while (i < ranges.length && j < this.ranges.length) {
+            if (IntervalMap.overlap(ranges[i], this.ranges[j])) {
+                // Found a match.
+                out.push(this.ranges[j]);
+                j++;
+            } else if (ranges[i][0] < this.ranges[j][0]) {
+                i++;
+            } else {
+                j++;
+            }
+        }
+        return out;
+    }
+
+    static overlap(r1, r2) {
+        return compareAddr(r1[1], r2[0]) > 0 && compareAddr(r1[0], r2[1]) < 0;
+    }
+}
+
+// Compare two AddrJS values.
+function compareAddr(a, b) {
+    if (a.length != b.length) {
+        return a.length - b.length;
+    }
+    if (a < b)
+        return -1;
+    else if (a > b)
+        return 1;
+    return 0;
+}
+
+var disasmTable;
+var disasmRows;
+var disasmPCs; // IntervalMap to row indexes;
+var disasmArrowSVG;
+var sourceView;
+
 function disasm(container, info) {
     const insts = info.Insts;
 
     // Create table.
     const table = $('<table class="disasm">').appendTo($(container).empty());
+    disasmTable = table;
 
     // Create table header.
     const groupHeader = $("<thead>").appendTo(table).
@@ -33,12 +91,13 @@ function disasm(container, info) {
     // Create disassembly table.
     const rows = [];
     const pcToRow = new Map();
+    const pcRanges = [];
     for (var inst of insts) {
         const args = formatArgs(inst.Args);
         // Create the row. The last TD is to extend the highlight over
         // the arrows SVG.
         const row = $("<tr>").attr("tabindex", -1).
-              append($("<td>").text("0x"+inst.PC.toString(16))).
+              append($("<td>").text("0x"+inst.PC)).
               append($("<td>").text(inst.Op)).
               append($("<td>").append(args)).
               append($("<td>")); // Extend the highlight over the arrows SVG
@@ -47,6 +106,7 @@ function disasm(container, info) {
         const rowMeta = {elt: row, i: rows.length, width: 1, arrows: []};
         rows.push(rowMeta);
         pcToRow.set(inst.PC, rowMeta);
+        pcRanges.push([inst.PC, 0, rowMeta.i]);
 
         // Add a gap after strict block terminators.
         if (inst.Control.Type != 0) {
@@ -56,14 +116,17 @@ function disasm(container, info) {
 
         // On-click handler.
         row.click(() => {
-            row.focus();
-            // Clear arrow highlights.
-            $("path", arrowSVG).attr({stroke: "black"});
-            // Highlight arrows.
-            rowMeta.arrows.forEach((a) => a.attr({stroke: "red"}));
-            // TODO: Change color of markers (annoyingly hard without SVG 2)
+            highlightRanges([pcRanges[rowMeta.i]]);
         });
     }
+    disasmRows = rows;
+
+    // Complete the PC ranges.
+    for (let i = 1; i < pcRanges.length; i++) {
+        pcRanges[i-1][1] = pcRanges[i][0];
+    }
+    pcRanges[pcRanges.length-1][1] = info.LastPC;
+    disasmPCs = new IntervalMap(pcRanges);
 
     // Collect control-flow arrows.
     const arrows = [];
@@ -158,9 +221,13 @@ function disasm(container, info) {
                 r2.arrows.push(line);
         }
     }
+    disasmArrowSVG = arrowSVG;
 
     // Add liveness.
     renderLiveness(info, tableInfo, rows);
+
+    // Add source view.
+    sourceView = new SourceView(info.SourceView, container);
 }
 
 function formatArgs(args) {
@@ -179,6 +246,24 @@ function formatArgs(args) {
         }
     }
     return $(elts);
+}
+
+function disasmHighlightRanges(ranges) {
+    // Clear row highlights.
+    $(".highlight", disasmTable).removeClass("highlight");
+
+    // Clear arrow highlights.
+    $("path", disasmArrowSVG).attr({stroke: "black"});
+
+    // Highlight matching instructions.
+    for (let match of disasmPCs.intersect(ranges)) {
+        let rowMeta = disasmRows[match[2]];
+        // Highlight row.
+        rowMeta.elt.addClass("highlight");
+        // Highlight arrows.
+        rowMeta.arrows.forEach((a) => a.attr({stroke: "red"}));
+        // TODO: Change color of markers (annoyingly hard without SVG 2)
+    }
 }
 
 function renderLiveness(info, table, rows) {

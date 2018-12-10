@@ -58,6 +58,10 @@ func (i *x86Inst) PC() uint64 {
 	return i.pc
 }
 
+func (i *x86Inst) Len() int {
+	return i.Inst.Len
+}
+
 func (i *x86Inst) Control() Control {
 	var c Control
 

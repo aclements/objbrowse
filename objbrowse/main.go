@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aclements/objbrowse/internal/asm"
@@ -41,9 +42,14 @@ func main() {
 }
 
 type state struct {
-	bin      obj.Obj
-	symTab   *symtab.Table
-	pcToFunc map[uint64]*functab.Func
+	bin        obj.Obj
+	symTab     *symtab.Table
+	pcToFunc   map[uint64]*functab.Func
+	sourceView *SourceView
+}
+
+type FileInfo struct {
+	Obj obj.Obj
 }
 
 func open() *state {
@@ -82,7 +88,10 @@ func open() *state {
 		}
 	}
 
-	return &state{bin, symTab, pcToFunc}
+	// TODO: Do something with the error.
+	sourceView, _ := NewSourceView(&FileInfo{bin})
+
+	return &state{bin, symTab, pcToFunc, sourceView}
 }
 
 func (s *state) serve() {
@@ -92,6 +101,7 @@ func (s *state) serve() {
 	}
 	http.HandleFunc("/", s.httpMain)
 	http.Handle("/objbrowse.js", http.FileServer(http.Dir("")))
+	http.Handle("/sourceview.js", http.FileServer(http.Dir("")))
 	http.HandleFunc("/s/", s.httpSym)
 	addr := "http://" + ln.Addr().String()
 	fmt.Printf("Listening on %s\n", addr)
@@ -125,17 +135,37 @@ var tmplMain = template.Must(template.New("").Parse(`
 </body></html>
 `))
 
+// AddrJS is an address for storing in JSON. It is represented in hex
+// with no leading "0x".
+type AddrJS uint64
+
+func (a AddrJS) MarshalJSON() ([]byte, error) {
+	buf := make([]byte, 0, 18)
+	buf = append(buf, '"')
+	buf = strconv.AppendUint(buf, uint64(a), 16)
+	return append(buf, '"'), nil
+}
+
 type SymInfo struct {
-	Insts []Disasm
+	Insts  []Disasm
+	LastPC AddrJS
 
 	Liveness Liveness
+
+	SourceView interface{}
 }
 
 type Disasm struct {
-	PC      uint64
+	PC      AddrJS
 	Op      string
 	Args    []string
-	Control asm.Control
+	Control ControlJS
+}
+
+type ControlJS struct {
+	Type        asm.ControlType
+	Conditional bool
+	TargetPC    AddrJS
 }
 
 func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
@@ -153,6 +183,9 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 	// corresponding to those instructions, etc. Could have
 	// further parallel views, too, like decoding hex values using
 	// DWARF type information.
+
+	// TODO: Allow selecting a range of lines and highlighting all
+	// of them.
 
 	// TODO: Support for overlaying things like profile
 	// information? (Could also use this for liveness, etc.) Would
@@ -209,15 +242,21 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 		// the pointer in the funcval.
 		disasm := inst.GoSyntax(s.symTab.SymName)
 		op, args := parse(disasm)
+		control := inst.Control()
 		//r, w := inst.Effects()
 
 		//lines = append(lines, fmt.Sprintf("%s %x %x", disasm, r, w))
 		disasms = append(disasms, Disasm{
-			PC:      inst.PC(),
-			Op:      op,
-			Args:    args,
-			Control: inst.Control(),
+			PC:   AddrJS(inst.PC()),
+			Op:   op,
+			Args: args,
+			Control: ControlJS{
+				Type:        control.Type,
+				Conditional: control.Conditional,
+				TargetPC:    AddrJS(control.TargetPC),
+			},
 		})
+		info.LastPC = AddrJS(inst.PC() + uint64(inst.Len()))
 	}
 	info.Insts = disasms
 
@@ -228,6 +267,15 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	info.Liveness = l
+
+	// Process SourceView.
+	sv, err := s.sourceView.DecodeSym(&FileInfo{s.bin}, sym)
+	if err != nil {
+		// TODO: Display this to the user.
+		log.Print(err)
+	} else {
+		info.SourceView = sv
+	}
 
 	if err := tmplSym.Execute(w, info); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -258,12 +306,20 @@ func parse(disasm string) (op string, args []string) {
 var tmplSym = template.Must(template.New("").Parse(`
 <html><body>
 <style>
+  body { font-family: sans-serif; }
+
+  .highlight { background: #c6eaff; }
+
   .disasm { border-spacing: 0; }
   .disasm td { padding: 0 .5em; }
   .disasm th { padding: 0 .5em; }
-  .disasm tr:hover { background: #c6eaff; }
-  .disasm tr:focus { background: #75ccff; }
+  .disasm tr:hover { background: #75ccff; }
   .disasm .flag { text-align: center; }
+
+  .sv-path { text-align: left; padding-top: 1em; }
+  .sv-error { color: #ff0000; }
+  .sv-line { text-align: right; vertical-align: top; color: #888; border-right: #eee 1px solid; user-select: none; padding-right: 0.5em; }
+  .sv-src { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }
 </style>
 <svg width="0" height="0" viewBox="0 0 0 0">
   <defs>
@@ -282,6 +338,7 @@ var tmplSym = template.Must(template.New("").Parse(`
 <div id="container"></div>
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
 <script src="/objbrowse.js"></script>
+<script src="/sourceview.js"></script>
 <script>disasm(document.getElementById("container"), {{$}})</script>
 </body></html>
 `))

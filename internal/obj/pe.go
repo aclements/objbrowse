@@ -5,6 +5,7 @@
 package obj
 
 import (
+	"debug/dwarf"
 	"debug/pe"
 	"fmt"
 	"io"
@@ -124,4 +125,8 @@ func (f *peFile) SymbolData(s Sym) ([]byte, error) {
 	}
 	_, err := sect.ReadAt(out[:flen], int64(pos))
 	return out, err
+}
+
+func (f *peFile) DWARF() (*dwarf.Data, error) {
+	return f.pe.DWARF()
 }

@@ -26,6 +26,9 @@ type Inst interface {
 	// PC returns the address of this instruction.
 	PC() uint64
 
+	// Len returns the length of this instruction in bytes.
+	Len() int
+
 	// Control returns the control-flow effects of this
 	// instruction.
 	Control() Control

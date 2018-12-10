@@ -5,6 +5,7 @@
 package obj
 
 import (
+	"debug/dwarf"
 	"fmt"
 	"io"
 )
@@ -22,6 +23,7 @@ type Obj interface {
 	Mem
 	Symbols() ([]Sym, error)
 	SymbolData(s Sym) ([]byte, error)
+	DWARF() (*dwarf.Data, error)
 }
 
 type Sym struct {

@@ -5,6 +5,7 @@
 package obj
 
 import (
+	"debug/dwarf"
 	"debug/elf"
 	"fmt"
 	"io"
@@ -99,4 +100,8 @@ func (f *elfFile) sectData(sect *elf.Section, ptr, size uint64) ([]byte, error) 
 	}
 	_, err := sect.ReadAt(out[:flen], int64(pos))
 	return out, err
+}
+
+func (f *elfFile) DWARF() (*dwarf.Data, error) {
+	return f.elf.DWARF()
 }
