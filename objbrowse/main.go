@@ -327,6 +327,8 @@ var tmplSym = template.Must(template.New("").Parse(`
   .disasm tr:hover { background: #def8ff; }
   .disasm .flag { text-align: center; }
 
+  .asm-inst { white-space: nowrap; }
+
   .sv-path { text-align: left; padding-top: 1em; }
   .sv-error { color: #ff0000; }
   .sv-src { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }

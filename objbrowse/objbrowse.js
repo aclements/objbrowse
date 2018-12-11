@@ -173,8 +173,8 @@ function disasm(container, info) {
         const row = $("<tr>").
               append($("<td>").text("0x"+inst.PC).addClass("pos")).
               append($("<td>").text("+0x"+pcDelta).addClass("pos")).
-              append($("<td>").text(inst.Op)).
-              append($("<td>").append(args)).
+              append($("<td>").text(inst.Op).addClass("asm-inst")).
+              append($("<td>").append(args).addClass("asm-inst")).
               append($("<td>")); // Extend the highlight over the arrows SVG
         table.append(row);
 
