@@ -26,16 +26,17 @@ type Liveness struct {
 	Locals, Args []string
 }
 
-func (s *state) liveness(sym obj.Sym, insts asm.Seq) (l Liveness, err error) {
+func (s *state) liveness(sym obj.Sym, insts asm.Seq) (interface{}, error) {
 	fn := s.pcToFunc[sym.Value]
 	if fn == nil {
-		return
+		return nil, nil
 	}
 
 	// TODO: Use the correct pointer size. We only support amd64
 	// right now anyway, so this is fine.
 	//
 	// TODO: Perhaps more of this knowledge should be in functab.
+	var l Liveness
 	l.PtrSize = 8
 	l.VarpDelta = -l.PtrSize
 	l.ArgpDelta = 0 // MinFrameSize
@@ -43,7 +44,11 @@ func (s *state) liveness(sym obj.Sym, insts asm.Seq) (l Liveness, err error) {
 	// Decode bitmaps.
 	liveness, err := fn.Liveness()
 	if err != nil {
-		return Liveness{}, err
+		return nil, err
+	}
+	if len(liveness.Locals) == 0 {
+		// No liveness data.
+		return nil, nil
 	}
 	for _, bitmap := range liveness.Locals {
 		l.Locals = append(l.Locals, bitmap.Hex())

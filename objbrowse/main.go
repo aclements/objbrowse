@@ -150,9 +150,9 @@ type SymInfo struct {
 	Insts  []Disasm
 	LastPC AddrJS
 
-	Liveness Liveness
+	Liveness interface{} `json:",omitempty"`
 
-	SourceView interface{}
+	SourceView interface{} `json:",omitempty"`
 }
 
 type Disasm struct {

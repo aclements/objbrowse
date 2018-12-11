@@ -302,6 +302,10 @@ function disasmHighlightRanges(ranges) {
 }
 
 function renderLiveness(info, table, rows) {
+    if (info.Liveness === undefined) {
+        return;
+    }
+
     const ptrSize = info.Liveness.PtrSize;
 
     // Decode live bitmaps.
