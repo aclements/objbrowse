@@ -29,7 +29,7 @@ class SourceView {
             let lineNo = block.Start;
             for (let i = 0; i < block.Text.length; i++) {
                 const tr = $('<tr>').append(
-                    $('<td>').addClass('sv-line').text(lineNo)
+                    $('<td>').addClass('pos').text(lineNo)
                 ).append(
                     $('<td>').addClass('sv-src').text(block.Text[i])
                 );

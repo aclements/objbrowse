@@ -311,6 +311,15 @@ var tmplSym = template.Must(template.New("").Parse(`
   body { font-family: sans-serif; }
 
   .highlight { background: #c6eaff; }
+  .pos {
+    text-align: right;
+    vertical-align: top;
+    font-family: monospace;
+    color: #888;
+    user-select: none;
+    padding-right: 0.5em;
+  }
+  td.pos + td:not(.pos) { border-left: #eee 1px solid; }
 
   .disasm { border-spacing: 0; }
   .disasm td { padding: 0 .5em; }
@@ -320,7 +329,6 @@ var tmplSym = template.Must(template.New("").Parse(`
 
   .sv-path { text-align: left; padding-top: 1em; }
   .sv-error { color: #ff0000; }
-  .sv-line, .asm-pc { text-align: right; vertical-align: top; color: #888; border-right: #eee 1px solid; user-select: none; padding-right: 0.5em; font-family: monospace; }
   .sv-src { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }
 </style>
 <svg width="0" height="0" viewBox="0 0 0 0">

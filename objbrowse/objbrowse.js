@@ -60,6 +60,55 @@ function compareAddr(a, b) {
     return 0;
 }
 
+// subAddr computes a-b where a, and the result are AddrJS values.
+// bits is the maximum number of bits in the result (only relevant if
+// there is wraparound).
+function subAddr(a, b, bits) {
+    // Process 16 bits at a time.
+    const digits = 4;
+    const outDigits = Math.floor((bits + 3) / 4);
+    let out = "";
+    let borrow = false;
+    while (a.length > 0 || b.length > 0 || (borrow && out.length < outDigits)) {
+        let ax = a.substr(a.length - digits);
+        let bx = b.substr(b.length - digits);
+        a = a.substring(0, a.length - digits);
+        b = b.substring(0, b.length - digits);
+        if (ax.length == 0) {
+            ax = 0;
+        } else {
+            ax = parseInt(ax, 16);
+        }
+        if (bx.length == 0) {
+            bx = 0;
+        } else {
+            bx = parseInt(bx, 16);
+        }
+
+        if (borrow) {
+            bx++;
+        }
+
+        borrow = ax < bx;
+        if (borrow) {
+            // Borrow.
+            ax += 1<<(4*digits);
+        }
+
+        let ox = ax - bx;
+        out = ox.toString(16).padStart(digits, "0") + out;
+    }
+
+    // Trim to outDigits.
+    out = out.substr(out.length - outDigits);
+
+    // Trim leading 0s.
+    let trim = 0;
+    for (; trim < out.length-1 && out[trim] == "0"; trim++);
+    out = out.substring(trim);
+    return out;
+}
+
 class Panels {
     constructor(container) {
         this._c = $("<div>").css({position: "relative", height: "100%", display: "flex"});
@@ -99,16 +148,16 @@ function disasm(container, info) {
 
     // Create table header.
     const groupHeader = $("<thead>").appendTo(table).
-          append($('<td colspan="4">'));
+          append($('<td colspan="5">'));
     const header = $("<thead>").appendTo(table).
-          append($('<td colspan="4">'));
+          append($('<td colspan="5">'));
     const tableInfo = {table: table, groupHeader: groupHeader, header: header};
 
     // Create a zero-height TD at the top that will contain the
     // control flow arrows SVG.
     const arrowTD = $("<td>");
     $("<tr>").appendTo(table).
-        append($('<td colspan="3">')).
+        append($('<td colspan="4">')).
         append(arrowTD);
     var arrowSVG;
 
@@ -118,10 +167,12 @@ function disasm(container, info) {
     const pcRanges = [];
     for (var inst of insts) {
         const args = formatArgs(inst.Args);
+        const pcDelta = subAddr(inst.PC, insts[0].PC, 64);
         // Create the row. The last TD is to extend the highlight over
         // the arrows SVG.
         const row = $("<tr>").
-              append($("<td>").text("0x"+inst.PC).addClass("asm-pc")).
+              append($("<td>").text("0x"+inst.PC).addClass("pos")).
+              append($("<td>").text("+0x"+pcDelta).addClass("pos")).
               append($("<td>").text(inst.Op)).
               append($("<td>").append(args)).
               append($("<td>")); // Extend the highlight over the arrows SVG
