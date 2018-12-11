@@ -208,15 +208,15 @@ function disasm(container, info) {
     if (arrows.length > 0) {
         const rowHeight = rows[0].elt.height();
         const svgWidth = cols * arrowWidth;
-        arrowTD.css({"vertical-align": "top", "width": svgWidth});
-        const arrowDiv = $("<div>").css({position: "relative"}).appendTo(arrowTD);
+        arrowTD.css({"vertical-align": "top"});
+        const arrowDiv = $("<div>").css({height: "0px"}).appendTo(arrowTD);
         const tdTop = arrowTD.offset().top;
         // Create the arrows SVG. This is absolutely positioned so the
         // row highlight in the other TRs can extend over it and has
         // pointer-events: none so hover passes through to the TR.
         arrowSVG = $(document.createElementNS("http://www.w3.org/2000/svg", "svg")).
             attr({height: table.height(), width: svgWidth}).
-            css({position: "absolute", "pointer-events": "none"}).
+            css({"pointer-events": "none"}).
             appendTo(arrowDiv);
         for (var arrow of arrows) {
             const line = $(document.createElementNS("http://www.w3.org/2000/svg", "path"));
