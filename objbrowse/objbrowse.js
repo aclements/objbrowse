@@ -74,22 +74,12 @@ class Panels {
             overflow: "auto", height: "100%", boxSizing: "border-box",
             padding: "8px", flex: "1",
         });
-        if (this._cols.length == 0) {
-            // Create first column.
-        } else {
-            // Create separator.
-            this._c.append(this._newSep());
+        if (this._cols.length >= 0) {
+            div.css({borderLeft: "2px solid #888"});
         }
         this._c.append(div);
         this._cols.push({div: div});
         return div[0];
-    }
-
-    _newSep() {
-        return $("<div>").css({
-            width: "2px", height: "100%", boxSizing: "border-box",
-            marginRight: "4px", marginLeft: "4px",
-            background: "#888"});
     }
 }
 
@@ -130,8 +120,8 @@ function disasm(container, info) {
         const args = formatArgs(inst.Args);
         // Create the row. The last TD is to extend the highlight over
         // the arrows SVG.
-        const row = $("<tr>").attr("tabindex", -1).
-              append($("<td>").text("0x"+inst.PC)).
+        const row = $("<tr>").
+              append($("<td>").text("0x"+inst.PC).addClass("asm-pc")).
               append($("<td>").text(inst.Op)).
               append($("<td>").append(args)).
               append($("<td>")); // Extend the highlight over the arrows SVG
