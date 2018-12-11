@@ -32,11 +32,12 @@ type BasicBlock struct {
 	// Succs is the successors of this basic block. Different
 	// types of blocks have different numbers of successors:
 	//
-	// Type  len(Succs)
-	// None  1
-	// Jump  1 or 2 depending on Control.Conditional
-	// Ret   0 or 1 depending on Control.Conditional
-	// Exit  0 or 1 depending on Control.Conditional
+	// Type        len(Succs)
+	// None        1
+	// Jump        1 or 2 depending on Control.Conditional
+	// Ret         0 or 1 depending on Control.Conditional
+	// JumpUnknown 0 or 1 depending on Control.Conditional
+	// Exit        0 or 1 depending on Control.Conditional
 	//
 	// TODO: Be consistent about true/false order?
 	Succs []Edge
@@ -88,11 +89,18 @@ func BasicBlocks(seq Seq) ([]*BasicBlock, error) {
 		c := inst.Control()
 		switch c.Type {
 		case ControlJump:
+			newBlock = true
 			if c.TargetPC == 0 {
-				return nil, fmt.Errorf("jump with unknown target: %s", inst)
+				// Unknown target.
+				//
+				// This makes the analysis incomplete,
+				// since this could jump to a PC in
+				// this function. However, it's often
+				// used to jump to other functions, so
+				// it's useful to get what we can.
+				break
 			}
 			startPCs = append(startPCs, c.TargetPC)
-			newBlock = true
 		case ControlRet, ControlExit:
 			newBlock = true
 		}
@@ -168,6 +176,13 @@ func BasicBlocks(seq Seq) ([]*BasicBlock, error) {
 			if bb.Control.Conditional {
 				next = true
 			}
+			if bb.Control.TargetPC == 0 {
+				// Jump to unknown PC. Turn this into
+				// a ControlJumpUnknown, since it
+				// could go anywhere.
+				bb.Control.Type = ControlJumpUnknown
+				break
+			}
 			tbb, ok := bbPCs[bb.Control.TargetPC]
 			if !ok {
 				// Jump outside function. Turn this
@@ -183,7 +198,7 @@ func BasicBlocks(seq Seq) ([]*BasicBlock, error) {
 			}
 
 		default:
-			panic(fmt.Sprintf("bad control type %s", bb.Control.Type))
+			panic(fmt.Sprintf("bad control type %v", bb.Control.Type))
 		}
 
 		if next {

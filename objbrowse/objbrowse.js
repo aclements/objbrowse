@@ -7,7 +7,8 @@
 const ControlJump = 1
 const ControlCall = 2
 const ControlRet = 3
-const ControlExit = 4
+const ControlJumpUnknown = 4
+const ControlExit = 5
 
 function highlightRanges(ranges) {
     disasmHighlightRanges(ranges);
@@ -279,7 +280,8 @@ function disasm(container, info) {
                 const y = r1.elt.offset().top - tdTop + rowHeight / 2;
                 const w = arrowWidth - markerHeight;
                 line.attr("d", "M " + (w + markerHeight) + " " + y + "h" + (-w));
-            } else if (arrow.control.Type == ControlExit || arrow.control.TargetPC != 0) {
+            } else if (arrow.control.Type == ControlExit || arrow.control.TargetPC != 0 ||
+                       (arrow.control.Type == ControlJump && arrow.control.TargetPC == 0)) {
                 // Out arrow.
                 // TODO: Some other arrow for dynamic target.
                 const y = r1.elt.offset().top - tdTop + rowHeight / 2;

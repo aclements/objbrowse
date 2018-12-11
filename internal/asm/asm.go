@@ -58,6 +58,11 @@ const (
 	ControlCall
 	ControlRet
 
+	// ControlJumpUnknown is a jump with an unknown target. This
+	// means the control analysis could be incomplete, since this
+	// could jump to an instruction in the analyzed function.
+	ControlJumpUnknown
+
 	// ControlExit is like a call that never returns.
 	ControlExit
 )
