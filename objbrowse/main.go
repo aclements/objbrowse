@@ -102,6 +102,7 @@ func (s *state) serve() {
 	http.HandleFunc("/", s.httpMain)
 	http.Handle("/objbrowse.js", http.FileServer(http.Dir("")))
 	http.Handle("/sourceview.js", http.FileServer(http.Dir("")))
+	http.Handle("/asmview.js", http.FileServer(http.Dir("")))
 	http.HandleFunc("/s/", s.httpSym)
 	addr := "http://" + ln.Addr().String()
 	fmt.Printf("Listening on %s\n", addr)
@@ -348,8 +349,9 @@ var tmplSym = template.Must(template.New("").Parse(`
   </defs>
 </svg>
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
-<script src="/objbrowse.js"></script>
 <script src="/sourceview.js"></script>
-<script>disasm(document.body, {{$}})</script>
+<script src="/asmview.js"></script>
+<script src="/objbrowse.js"></script>
+<script>render(document.body, {{$}})</script>
 </body></html>
 `))
