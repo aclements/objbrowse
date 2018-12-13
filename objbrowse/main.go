@@ -148,6 +148,8 @@ func (a AddrJS) MarshalJSON() ([]byte, error) {
 }
 
 type SymInfo struct {
+	Title string
+
 	Insts  []Disasm
 	LastPC AddrJS
 
@@ -206,7 +208,10 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 
 	var info SymInfo
 
-	sym, ok := s.symTab.Name(r.URL.Path[3:])
+	symName := r.URL.Path[3:]
+	info.Title = symName
+
+	sym, ok := s.symTab.Name(symName)
 	if !ok {
 		fmt.Println(w, "unknown symbol")
 		return
@@ -305,7 +310,9 @@ func parse(disasm string) (op string, args []string) {
 }
 
 var tmplSym = template.Must(template.New("").Parse(`
-<html><body>
+<html>
+<head><title>{{$.Title}}</title></head>
+<body>
 <style>
   html, body { margin: 0px; padding: 0px; }
 
