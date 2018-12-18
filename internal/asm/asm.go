@@ -4,10 +4,27 @@
 
 package asm
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+
+	"github.com/aclements/objbrowse/internal/arch"
+)
 
 // TODO: Generalize to more than an index so we can support stack
 // slots. Compute stack slot Locs.
+
+// Disasm disassembles machine code for the given architecture. pc is
+// the program counter at which text begins.
+func Disasm(arch *arch.Arch, text []byte, pc uint64) (Seq, error) {
+	switch arch.GoArch {
+	case "amd64":
+		return disasmX86(text, pc, 64), nil
+	case "386":
+		return disasmX86(text, pc, 32), nil
+	}
+	return nil, fmt.Errorf("unsupported assembly architecture: %s", arch)
+}
 
 // Seq is a sequence of instructions.
 type Seq interface {

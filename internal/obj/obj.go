@@ -8,6 +8,8 @@ import (
 	"debug/dwarf"
 	"fmt"
 	"io"
+
+	"github.com/aclements/objbrowse/internal/arch"
 )
 
 // Mem represents a sparse memory map.
@@ -21,9 +23,16 @@ type Mem interface {
 
 type Obj interface {
 	Mem
+	Info() ObjInfo
 	Symbols() ([]Sym, error)
 	SymbolData(s Sym) ([]byte, error)
 	DWARF() (*dwarf.Data, error)
+}
+
+type ObjInfo struct {
+	// Arch is the machine architecture of this object file, or
+	// nil if unknown.
+	Arch *arch.Arch
 }
 
 type Sym struct {

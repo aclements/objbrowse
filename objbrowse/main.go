@@ -223,7 +223,11 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	insts := asm.DisasmX86_64(data, sym.Value)
+	insts, err := asm.Disasm(s.bin.Info().Arch, data, sym.Value)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if true { // TODO
 		bbs, err := asm.BasicBlocks(insts)

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"sort"
+
+	"github.com/aclements/objbrowse/internal/arch"
 )
 
 type peFile struct {
@@ -34,6 +36,17 @@ func openPE(r io.ReaderAt) (Obj, error) {
 	}
 
 	return &peFile{f, imageBase}, nil
+}
+
+var peToArch = map[uint16]*arch.Arch{
+	pe.IMAGE_FILE_MACHINE_AMD64: arch.AMD64,
+	pe.IMAGE_FILE_MACHINE_I386:  arch.I386,
+}
+
+func (f *peFile) Info() ObjInfo {
+	return ObjInfo{
+		peToArch[f.pe.Machine],
+	}
 }
 
 func (f *peFile) Data(ptr, size uint64) ([]byte, error) {

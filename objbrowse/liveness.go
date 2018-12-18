@@ -32,14 +32,12 @@ func (s *state) liveness(sym obj.Sym, insts asm.Seq) (interface{}, error) {
 		return nil, nil
 	}
 
-	// TODO: Use the correct pointer size. We only support amd64
-	// right now anyway, so this is fine.
-	//
 	// TODO: Perhaps more of this knowledge should be in functab.
 	var l Liveness
-	l.PtrSize = 8
+	arch := s.bin.Info().Arch
+	l.PtrSize = arch.PtrSize
 	l.VarpDelta = -l.PtrSize
-	l.ArgpDelta = 0 // MinFrameSize
+	l.ArgpDelta = arch.MinFrameSize
 
 	// Decode bitmaps.
 	liveness, err := fn.Liveness()

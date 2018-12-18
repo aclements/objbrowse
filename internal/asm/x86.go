@@ -22,10 +22,10 @@ func (s x86Seq) Get(i int) Inst {
 	return &s[i]
 }
 
-func DisasmX86_64(text []byte, pc uint64) Seq {
+func disasmX86(text []byte, pc uint64, bits int) Seq {
 	var out x86Seq
 	for len(text) > 0 {
-		inst, err := x86asm.Decode(text, 64) // TODO: Support 32-bit
+		inst, err := x86asm.Decode(text, bits)
 		size := inst.Len
 		if err != nil || size == 0 || inst.Op == 0 {
 			inst = x86asm.Inst{}

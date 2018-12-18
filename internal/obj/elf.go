@@ -9,6 +9,8 @@ import (
 	"debug/elf"
 	"fmt"
 	"io"
+
+	"github.com/aclements/objbrowse/internal/arch"
 )
 
 type elfFile struct {
@@ -21,6 +23,17 @@ func openElf(r io.ReaderAt) (Obj, error) {
 		return nil, err
 	}
 	return &elfFile{f}, nil
+}
+
+var elfToArch = map[elf.Machine]*arch.Arch{
+	elf.EM_X86_64: arch.AMD64,
+	elf.EM_386:    arch.I386,
+}
+
+func (f *elfFile) Info() ObjInfo {
+	return ObjInfo{
+		elfToArch[f.elf.Machine],
+	}
 }
 
 func (f *elfFile) Data(ptr, size uint64) ([]byte, error) {
