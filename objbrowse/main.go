@@ -213,7 +213,7 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 
 	sym, ok := s.symTab.Name(symName)
 	if !ok {
-		fmt.Println(w, "unknown symbol")
+		fmt.Fprintln(w, "unknown symbol")
 		return
 	}
 
