@@ -4,8 +4,7 @@
 
 "use strict";
 
-// TODO: Tidy up the data model to cleanly separate asm data from
-// other view data and overlays. Maybe get each piece with XHR.
+// TODO: Maybe get each piece with XHR.
 
 // TODO: Separate out the overlays. Possibly make them generic so
 // anything can feed rows with address ranges into them and they can
@@ -190,7 +189,8 @@ class AsmView {
         this._arrowSVG = arrowSVG;
 
         // Add liveness.
-        renderLiveness(data, tableInfo, rows);
+        if (data.Liveness)
+            renderLiveness(data.Liveness, data.Insts, tableInfo, rows);
     }
 
     static _formatArgs(args) {

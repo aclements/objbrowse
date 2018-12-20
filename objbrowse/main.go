@@ -13,12 +13,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
-	"github.com/aclements/objbrowse/internal/asm"
-	"github.com/aclements/objbrowse/internal/functab"
 	"github.com/aclements/objbrowse/internal/obj"
-	"github.com/aclements/objbrowse/internal/ssa"
 	"github.com/aclements/objbrowse/internal/symtab"
 )
 
@@ -44,7 +40,7 @@ func main() {
 type state struct {
 	bin        obj.Obj
 	symTab     *symtab.Table
-	pcToFunc   map[uint64]*functab.Func
+	asmView    *AsmView
 	sourceView *SourceView
 }
 
@@ -70,28 +66,12 @@ func open() *state {
 
 	symTab := symtab.NewTable(syms)
 
-	// Collect function info.
-	pcToFunc := make(map[uint64]*functab.Func)
-	pclntab, ok := symTab.Name("runtime.pclntab")
-	if ok {
-		data, err := bin.SymbolData(pclntab)
-		if err != nil {
-			log.Fatal(err)
-		}
-		funcTab, err := functab.NewFuncTab(data, bin.(obj.Mem))
-		if err != nil {
-			log.Fatal(err)
-		}
-		for _, fn := range funcTab.Funcs {
-			pcToFunc[fn.PC] = fn
-
-		}
-	}
-
 	// TODO: Do something with the error.
-	sourceView, _ := NewSourceView(&FileInfo{bin})
+	fi := &FileInfo{bin}
+	asmView, _ := NewAsmView(fi, symTab)
+	sourceView, _ := NewSourceView(fi)
 
-	return &state{bin, symTab, pcToFunc, sourceView}
+	return &state{bin, symTab, asmView, sourceView}
 }
 
 func (s *state) serve() {
@@ -150,25 +130,13 @@ func (a AddrJS) MarshalJSON() ([]byte, error) {
 type SymInfo struct {
 	Title string
 
-	Insts  []Disasm
-	LastPC AddrJS
+	// Insts  []Disasm
+	// LastPC AddrJS
 
-	Liveness interface{} `json:",omitempty"`
+	// Liveness interface{} `json:",omitempty"`
 
+	AsmView    interface{} `json:",omitempty"`
 	SourceView interface{} `json:",omitempty"`
-}
-
-type Disasm struct {
-	PC      AddrJS
-	Op      string
-	Args    []string
-	Control ControlJS
-}
-
-type ControlJS struct {
-	Type        asm.ControlType
-	Conditional bool
-	TargetPC    AddrJS
 }
 
 func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
@@ -223,60 +191,14 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	insts, err := asm.Disasm(s.bin.Info().Arch, data, sym.Value)
+	// Process AsmView.
+	av, err := s.asmView.DecodeSym(sym, data)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		// TODO: Display this to the user.
+		log.Print(err)
+	} else {
+		info.AsmView = av
 	}
-
-	if true { // TODO
-		bbs, err := asm.BasicBlocks(insts)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		f := ssa.SSA(insts, bbs)
-		f.Fprint(os.Stdout)
-	}
-
-	//var lines []string
-	var disasms []Disasm
-	for i := 0; i < insts.Len(); i++ {
-		inst := insts.Get(i)
-		// TODO: Often the address lookups are for type.*,
-		// go.string.*, or go.func.*. These are pretty
-		// useless. We should at least link to the right place
-		// in a hex dump. It would be way better if we could
-		// do something like printing the string or resolving
-		// the pointer in the funcval.
-		disasm := inst.GoSyntax(s.symTab.SymName)
-		op, args := parse(disasm)
-		control := inst.Control()
-		//r, w := inst.Effects()
-
-		//lines = append(lines, fmt.Sprintf("%s %x %x", disasm, r, w))
-		disasms = append(disasms, Disasm{
-			PC:   AddrJS(inst.PC()),
-			Op:   op,
-			Args: args,
-			Control: ControlJS{
-				Type:        control.Type,
-				Conditional: control.Conditional,
-				TargetPC:    AddrJS(control.TargetPC),
-			},
-		})
-		info.LastPC = AddrJS(inst.PC() + uint64(inst.Len()))
-	}
-	info.Insts = disasms
-
-	// Process liveness information.
-	l, err := s.liveness(sym, insts)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	info.Liveness = l
 
 	// Process SourceView.
 	sv, err := s.sourceView.DecodeSym(&FileInfo{s.bin}, sym)
@@ -291,26 +213,6 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-}
-
-func parse(disasm string) (op string, args []string) {
-	i := strings.Index(disasm, " ")
-	// Include prefixes in op. In Go syntax, these are followed by
-	// a semicolon.
-	for i > 0 && disasm[i-1] == ';' {
-		j := strings.Index(disasm[i+1:], " ")
-		if j == -1 {
-			i = -1
-		} else {
-			i += 1 + j
-		}
-	}
-	if i == -1 {
-		return disasm, []string{}
-	}
-	op, disasm = disasm[:i], disasm[i+1:]
-	args = strings.Split(disasm, ", ")
-	return
 }
 
 var tmplSym = template.Must(template.New("").Parse(`

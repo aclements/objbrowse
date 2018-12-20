@@ -138,22 +138,20 @@ var sourceView;
 
 function render(container, info) {
     const panels = new Panels(container);
-    asmView = new AsmView(info, panels.addCol());
-    sourceView = new SourceView(info.SourceView, panels.addCol());
+    if (info.AsmView)
+        asmView = new AsmView(info.AsmView, panels.addCol());
+    if (info.SourceView)
+        sourceView = new SourceView(info.SourceView, panels.addCol());
 }
 
-function renderLiveness(info, table, rows) {
-    if (info.Liveness === undefined) {
-        return;
-    }
-
-    const ptrSize = info.Liveness.PtrSize;
+function renderLiveness(info, insts, table, rows) {
+    const ptrSize = info.PtrSize;
 
     // Decode live bitmaps.
     const locals = [], args = [];
-    for (const bm of info.Liveness.Locals)
+    for (const bm of info.Locals)
         locals.push(parseBitmap(bm));
-    for (const bm of info.Liveness.Args)
+    for (const bm of info.Args)
         args.push(parseBitmap(bm));
 
     // Compute varp/argp and covered range.
@@ -161,12 +159,12 @@ function renderLiveness(info, table, rows) {
     var liveMax = 0;
     var argMin = 0xffffffff;
     var argMax = 0;
-    const insts = [];
-    for (let i = 0; i < info.Insts.length; i++) {
-        const spoff = info.Liveness.SPOff[i];
-        insts[i] = {
-            varp: info.Liveness.VarpDelta + spoff,
-            argp: info.Liveness.ArgpDelta + spoff,
+    const iextra = []; // Extra per-instruction info
+    for (let i = 0; i < insts.length; i++) {
+        const spoff = info.SPOff[i];
+        iextra[i] = {
+            varp: info.VarpDelta + spoff,
+            argp: info.ArgpDelta + spoff,
         };
 
         // SPOff -1 indicates unknown SP offset. SPOff 0 happens at
@@ -175,17 +173,17 @@ function renderLiveness(info, table, rows) {
         if (spoff <= 0)
             continue;
 
-        const index = info.Liveness.Indexes[i];
+        const index = info.Indexes[i];
         if (index < 0)
             continue;
-        if (insts[i].varp > 0) {
-            insts[i].localp = insts[i].varp - locals[index].n * ptrSize;
-            liveMin = Math.min(liveMin, insts[i].localp);
-            liveMax = Math.max(liveMax, insts[i].varp);
+        if (iextra[i].varp > 0) {
+            iextra[i].localp = iextra[i].varp - locals[index].n * ptrSize;
+            liveMin = Math.min(liveMin, iextra[i].localp);
+            liveMax = Math.max(liveMax, iextra[i].varp);
         }
-        if (insts[i].argp > 0) {
-            argMin = Math.min(argMin, insts[i].argp);
-            argMax = Math.max(argMax, insts[i].argp + args[index].n * ptrSize);
+        if (iextra[i].argp > 0) {
+            argMin = Math.min(argMin, iextra[i].argp);
+            argMax = Math.max(argMax, iextra[i].argp + args[index].n * ptrSize);
         }
     }
     const haveArgs = argMin < argMax;
@@ -209,7 +207,7 @@ function renderLiveness(info, table, rows) {
     // Create table cells.
     for (var i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const index = info.Liveness.Indexes[i];
+        const index = info.Indexes[i];
         const addBit = function(addr, bitmap, base) {
             const i = (addr - base) / ptrSize;
             var text = "";
@@ -218,11 +216,11 @@ function renderLiveness(info, table, rows) {
             row.elt.append($("<td>").text(text).addClass("flag"));
         };
         for (let addr = liveMin; addr < liveMax; addr += ptrSize)
-            addBit(addr, locals[index], insts[i].localp);
+            addBit(addr, locals[index], iextra[i].localp);
         if (haveArgs) {
             row.elt.append($("<td>"));
             for (let addr = argMin; addr < argMax; addr += ptrSize)
-                addBit(addr, args[index], insts[i].argp);
+                addBit(addr, args[index], iextra[i].argp);
         }
     }
 }

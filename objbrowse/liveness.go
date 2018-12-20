@@ -5,11 +5,41 @@
 package main
 
 import (
+	"log"
+
 	"github.com/aclements/objbrowse/internal/asm"
+	"github.com/aclements/objbrowse/internal/functab"
 	"github.com/aclements/objbrowse/internal/obj"
+	"github.com/aclements/objbrowse/internal/symtab"
 )
 
-type Liveness struct {
+type LivenessOverlay struct {
+	fi       *FileInfo
+	pcToFunc map[uint64]*functab.Func
+}
+
+func NewLivenessOverlay(fi *FileInfo, symTab *symtab.Table) *LivenessOverlay {
+	// Collect function info.
+	pcToFunc := make(map[uint64]*functab.Func)
+	pclntab, ok := symTab.Name("runtime.pclntab")
+	if ok {
+		data, err := fi.Obj.SymbolData(pclntab)
+		if err != nil {
+			log.Fatal(err)
+		}
+		funcTab, err := functab.NewFuncTab(data, fi.Obj)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, fn := range funcTab.Funcs {
+			pcToFunc[fn.PC] = fn
+		}
+	}
+
+	return &LivenessOverlay{fi, pcToFunc}
+}
+
+type LivenessJS struct {
 	PtrSize int
 
 	// The difference between SPOff and Varp and Argp for this
@@ -26,15 +56,15 @@ type Liveness struct {
 	Locals, Args []string
 }
 
-func (s *state) liveness(sym obj.Sym, insts asm.Seq) (interface{}, error) {
-	fn := s.pcToFunc[sym.Value]
+func (o *LivenessOverlay) liveness(sym obj.Sym, insts asm.Seq) (interface{}, error) {
+	fn := o.pcToFunc[sym.Value]
 	if fn == nil {
 		return nil, nil
 	}
 
 	// TODO: Perhaps more of this knowledge should be in functab.
-	var l Liveness
-	arch := s.bin.Info().Arch
+	var l LivenessJS
+	arch := o.fi.Obj.Info().Arch
 	l.PtrSize = arch.PtrSize
 	l.VarpDelta = -l.PtrSize
 	l.ArgpDelta = arch.MinFrameSize
