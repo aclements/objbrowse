@@ -6,6 +6,8 @@
 
 class SourceView {
     constructor(data, container) {
+        this._container = container;
+        const view = this;
         const table = $("<table>").css({borderCollapse: "collapse"}).appendTo(container);
         this._table = table;
 
@@ -36,7 +38,7 @@ class SourceView {
                 table.append(tr);
                 let pcs = block.PCs[i];
                 if (pcs) {
-                    tr.click(() => { highlightRanges(pcs); });
+                    tr.click(() => { highlightRanges(pcs, view); });
                     for (let r of pcs) {
                         pcRanges.push([r[0], r[1], tr]);
                     }
@@ -50,13 +52,17 @@ class SourceView {
         this._pcRanges = new IntervalMap(pcRanges);
     }
 
-    highlightRanges(ranges) {
+    highlightRanges(ranges, scroll) {
         // Clear highlights.
         $(".highlight", this._table).removeClass("highlight");
 
         // New highlights.
+        var first = true;
         for (let match of this._pcRanges.intersect(ranges)) {
             match[2].addClass("highlight");
+            if (first && scroll)
+                scrollTo(this._container, match[2]);
+            first = false;
         }
     }
 }

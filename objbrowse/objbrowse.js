@@ -4,9 +4,9 @@
 
 "use strict";
 
-function highlightRanges(ranges) {
-    asmView.highlightRanges(ranges);
-    sourceView.highlightRanges(ranges);
+function highlightRanges(ranges, cause) {
+    asmView.highlightRanges(ranges, cause !== asmView);
+    sourceView.highlightRanges(ranges, cause !== sourceView);
 }
 
 // IntervalMap is a map of intervals.
@@ -125,6 +125,12 @@ class Panels {
         this._cols.push({div: div});
         return div[0];
     }
+}
+
+function scrollTo(container, elt) {
+    $(container).animate({
+        scrollTop: $(elt).position().top
+    }, 500);
 }
 
 var asmView;

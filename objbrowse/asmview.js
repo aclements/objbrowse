@@ -27,6 +27,8 @@ const ControlExit = 5
 
 class AsmView {
     constructor(data, container) {
+        this._container = container;
+        const view = this;
         const insts = data.Insts;
 
         // Create table.
@@ -78,7 +80,7 @@ class AsmView {
 
             // On-click handler.
             row.click(() => {
-                highlightRanges([pcRanges[rowMeta.i]]);
+                highlightRanges([pcRanges[rowMeta.i]], view);
             });
         }
         this._rows = rows;
@@ -209,7 +211,7 @@ class AsmView {
         return $(elts);
     }
 
-    highlightRanges(ranges) {
+    highlightRanges(ranges, scroll) {
         // Clear row highlights.
         $(".highlight", this._table).removeClass("highlight");
 
@@ -217,12 +219,17 @@ class AsmView {
         $("path", this._arrowSVG).attr({stroke: "black"});
 
         // Highlight matching instructions.
+        var first = true;
         for (let match of this._pcs.intersect(ranges)) {
             let rowMeta = this._rows[match[2]];
             // Highlight row.
             rowMeta.elt.addClass("highlight");
             // Highlight arrows.
             rowMeta.arrows.forEach((a) => a.attr({stroke: "red"}));
+            // Scroll in to view.
+            if (first && scroll)
+                scrollTo(this._container, rowMeta.elt);
+            first = false;
             // TODO: Change color of markers (annoyingly hard without SVG 2)
         }
     }

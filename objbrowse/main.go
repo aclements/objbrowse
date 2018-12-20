@@ -359,7 +359,7 @@ var tmplSym = template.Must(template.New("").Parse(`
     </marker>
   </defs>
 </svg>
-<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
 <script src="/sourceview.js"></script>
 <script src="/asmview.js"></script>
 <script src="/objbrowse.js"></script>
