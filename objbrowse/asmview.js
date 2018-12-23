@@ -71,7 +71,7 @@ class AsmView {
             const rowMeta = {elt: row, i: rows.length, width: 1, arrows: []};
             rows.push(rowMeta);
             pcToRow.set(inst.PC, rowMeta);
-            pcRanges.push([pc, 0, rowMeta.i]);
+            pcRanges.push({start: pc, end: null, i: rowMeta.i});
 
             // Add a gap after strict block terminators.
             if (inst.Control.Type != 0) {
@@ -88,9 +88,9 @@ class AsmView {
 
         // Complete the PC ranges.
         for (let i = 1; i < pcRanges.length; i++) {
-            pcRanges[i-1][1] = pcRanges[i][0];
+            pcRanges[i-1].end = pcRanges[i].start;
         }
-        pcRanges[pcRanges.length-1][1] = new AddrJS(data.LastPC);
+        pcRanges[pcRanges.length-1].end = new AddrJS(data.LastPC);
         this._pcs = new IntervalMap(pcRanges);
 
         // Collect control-flow arrows.
@@ -205,7 +205,8 @@ class AsmView {
             var r;
             if (r = /([^+]*)(\+(0x)?[0-9]+)?\(SB\)/.exec(arg)) {
                 const offset = parseInt(r[2]);
-                const ranges = [[new AddrJS(offset), new AddrJS(offset+1)]];
+                const ranges = [{start: new AddrJS(offset),
+                                 end: new AddrJS(offset+1)}];
                 const url = "/s/" + r[1] + "#+" + formatRanges(ranges);
                 elts.push($("<a>").attr("href", url).text(arg)[0]);
             } else {
@@ -225,7 +226,7 @@ class AsmView {
         // Highlight matching instructions.
         var first = true;
         for (let match of this._pcs.intersect(ranges)) {
-            let rowMeta = this._rows[match[2]];
+            let rowMeta = this._rows[match.i];
             // Highlight row.
             rowMeta.elt.addClass("highlight");
             // Highlight arrows.

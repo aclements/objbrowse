@@ -6,11 +6,12 @@
 
 // IntervalMap is a map of intervals over AddrJS values.
 class IntervalMap {
-    // ranges must be an array of [low, high, ...] arrays, where ...
-    // can be any additional data the caller wishes to store.
+    // ranges must be an array of objects with "start" and "end"
+    // properties, where each object covers a disjoint range [start,
+    // end).
     constructor(ranges) {
         // Sort ranges.
-        ranges.sort((a, b) => a[0].compare(b[0]));
+        ranges.sort((a, b) => a.start.compare(b.start));
         this.ranges = ranges;
     }
 
@@ -24,7 +25,7 @@ class IntervalMap {
                 // Found a match.
                 out.push(this.ranges[j]);
                 j++;
-            } else if (ranges[i][0] < this.ranges[j][0]) {
+            } else if (ranges[i].start < this.ranges[j].start) {
                 i++;
             } else {
                 j++;
@@ -34,7 +35,7 @@ class IntervalMap {
     }
 
     static overlap(r1, r2) {
-        return r1[1].compare(r2[0]) > 0 && r1[0].compare(r2[1]) < 0;
+        return r1.end.compare(r2.start) > 0 && r1.start.compare(r2.end) < 0;
     }
 }
 
@@ -230,8 +231,8 @@ function onHashChange() {
         const ranges = parseRanges(hash);
         if (relative) {
             for (let r of ranges) {
-                r[0] = r[0].add(baseAddr);
-                r[1] = r[1].add(baseAddr);
+                r.start = r.start.add(baseAddr);
+                r.end = r.end.add(baseAddr);
             }
         }
         highlightRanges(ranges, null);
@@ -256,7 +257,7 @@ function formatRanges(ranges) {
     for (let r of ranges) {
         if (out.length > 0)
             out += ","
-        out += r[0].toString() + "-" + r[1].toString();
+        out += r.start.toString() + "-" + r.end.toString();
     }
     return out;
 }
@@ -265,7 +266,7 @@ function parseRanges(ranges) {
     const out = [];
     for (let r of ranges.split(",")) {
         const parts = r.split("-", 2);
-        out.push([new AddrJS(parts[0]), new AddrJS(parts[1])]);
+        out.push({start: new AddrJS(parts[0]), end: new AddrJS(parts[1])});
     }
     return out;
 }

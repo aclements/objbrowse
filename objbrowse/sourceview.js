@@ -38,14 +38,14 @@ class SourceView {
                 table.append(tr);
                 let pcs = block.PCs[i];
                 if (pcs) {
-                    for (let r of pcs) {
-                        r[0] = new AddrJS(r[0]);
-                        r[1] = new AddrJS(r[1]);
+                    const lineRanges = []
+                    for (let pcr of pcs) {
+                        const r = {start: new AddrJS(pcr[0]),
+                                   end: new AddrJS(pcr[1]), tr: tr};
+                        pcRanges.push(r);
+                        lineRanges.push(r);
                     }
-                    tr.click(() => { highlightRanges(pcs, view); });
-                    for (let r of pcs) {
-                        pcRanges.push([r[0], r[1], tr]);
-                    }
+                    tr.click(() => { highlightRanges(lineRanges, view); });
                 } else {
                     tr.click(() => { highlightRanges([]); });
                 }
@@ -63,9 +63,9 @@ class SourceView {
         // New highlights.
         var first = true;
         for (let match of this._pcRanges.intersect(ranges)) {
-            match[2].addClass("highlight");
+            match.tr.addClass("highlight");
             if (first && scroll)
-                scrollTo(this._container, match[2]);
+                scrollTo(this._container, match.tr);
             first = false;
         }
     }

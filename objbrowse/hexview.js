@@ -49,7 +49,7 @@ class HexView {
             const startAddr = rowAddr;
             const nextAddr = this._addr.add(new AddrJS(off + 16));
             tr.addEventListener("click", () => {
-                highlightRanges([[startAddr, nextAddr]], view);
+                highlightRanges([{start: startAddr, end: nextAddr}], view);
             });
             rowAddr = nextAddr;
 
@@ -161,8 +161,8 @@ class HexView {
 
         for (let r of ranges) {
             // Convert addresses into byte offsets.
-            const b1 = r[0].sub(this._addr).toNumber();
-            const b2 = r[1].sub(this._addr).toNumber();
+            const b1 = r.start.sub(this._addr).toNumber();
+            const b2 = r.end.sub(this._addr).toNumber();
             for (let b = b1; b < b2;) {
                 const line = Math.floor(b / 16);
                 openLine(line);
