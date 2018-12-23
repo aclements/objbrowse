@@ -132,6 +132,7 @@ func (a AddrJS) MarshalJSON() ([]byte, error) {
 
 type SymInfo struct {
 	Title string
+	Base  AddrJS
 
 	HexView    interface{} `json:",omitempty"`
 	AsmView    interface{} `json:",omitempty"`
@@ -183,6 +184,7 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "unknown symbol")
 		return
 	}
+	info.Base = AddrJS(sym.Value)
 
 	data, err := s.bin.SymbolData(sym)
 	if err != nil {

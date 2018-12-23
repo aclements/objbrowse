@@ -4,15 +4,6 @@
 
 "use strict";
 
-function highlightRanges(ranges, cause) {
-    if (hexView)
-        hexView.highlightRanges(ranges, cause !== hexView);
-    if (asmView)
-        asmView.highlightRanges(ranges, cause !== asmView);
-    if (sourceView)
-        sourceView.highlightRanges(ranges, cause !== sourceView);
-}
-
 // IntervalMap is a map of intervals over AddrJS values.
 class IntervalMap {
     // ranges must be an array of [low, high, ...] arrays, where ...
@@ -207,6 +198,7 @@ function scrollTo(container, elt) {
 var asmView;
 var sourceView;
 var hexView;
+var baseAddr;
 
 function render(container, info) {
     const panels = new Panels(container);
@@ -216,6 +208,66 @@ function render(container, info) {
         asmView = new AsmView(info.AsmView, panels.addCol());
     if (info.SourceView)
         sourceView = new SourceView(info.SourceView, panels.addCol());
+
+    baseAddr = new AddrJS(info.Base);
+
+    window.addEventListener("hashchange", onHashChange, false);
+    $.fx.off = true;  // Inhibit scrolling animations during setup.
+    onHashChange();
+    $.fx.off = false;
+}
+
+function onHashChange() {
+    let hash = window.location.hash;
+    if (onHashChange.lastHash === hash)
+        return;
+    onHashChange.lastHash = hash;
+    if (hash != "" && hash != "#") {
+        hash = hash.substr(1);  // Trim "#"
+        const relative = hash[0] == "+";
+        if (relative)
+            hash = hash.substr(1);
+        const ranges = parseRanges(hash);
+        if (relative) {
+            for (let r of ranges) {
+                r[0] = r[0].add(baseAddr);
+                r[1] = r[1].add(baseAddr);
+            }
+        }
+        highlightRanges(ranges, null);
+    }
+}
+
+function highlightRanges(ranges, cause) {
+    if (hexView)
+        hexView.highlightRanges(ranges, cause !== hexView);
+    if (asmView)
+        asmView.highlightRanges(ranges, cause !== asmView);
+    if (sourceView)
+        sourceView.highlightRanges(ranges, cause !== sourceView);
+
+    const newHash = "#" + formatRanges(ranges);
+    onHashChange.lastHash = newHash; // Inhibit hashchange listener
+    window.location.hash = newHash
+}
+
+function formatRanges(ranges) {
+    let out = "";
+    for (let r of ranges) {
+        if (out.length > 0)
+            out += ","
+        out += r[0].toString() + "-" + r[1].toString();
+    }
+    return out;
+}
+
+function parseRanges(ranges) {
+    const out = [];
+    for (let r of ranges.split(",")) {
+        const parts = r.split("-", 2);
+        out.push([new AddrJS(parts[0]), new AddrJS(parts[1])]);
+    }
+    return out;
 }
 
 function renderLiveness(info, insts, table, rows) {

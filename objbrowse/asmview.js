@@ -204,8 +204,10 @@ class AsmView {
 
             var r;
             if (r = /([^+]*)(\+(0x)?[0-9]+)?\(SB\)/.exec(arg)) {
-                // TODO: Link to offset if there is one.
-                elts.push($("<a>").attr("href", "/s/" + r[1]).text(arg)[0]);
+                const offset = parseInt(r[2]);
+                const ranges = [[new AddrJS(offset), new AddrJS(offset+1)]];
+                const url = "/s/" + r[1] + "#+" + formatRanges(ranges);
+                elts.push($("<a>").attr("href", url).text(arg)[0]);
             } else {
                 elts.push(document.createTextNode(arg))
             }
