@@ -38,6 +38,10 @@ class SourceView {
                 table.append(tr);
                 let pcs = block.PCs[i];
                 if (pcs) {
+                    for (let r of pcs) {
+                        r[0] = new AddrJS(r[0]);
+                        r[1] = new AddrJS(r[1]);
+                    }
                     tr.click(() => { highlightRanges(pcs, view); });
                     for (let r of pcs) {
                         pcRanges.push([r[0], r[1], tr]);

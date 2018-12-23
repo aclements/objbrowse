@@ -53,9 +53,11 @@ class AsmView {
         const rows = [];
         const pcToRow = new Map();
         const pcRanges = [];
+        const basePC = new AddrJS(insts[0].PC);
         for (var inst of insts) {
             const args = AsmView._formatArgs(inst.Args);
-            const pcDelta = subAddr(inst.PC, insts[0].PC, 64);
+            const pc = new AddrJS(inst.PC);
+            const pcDelta = pc.sub(basePC);
             // Create the row. The last TD is to extend the highlight over
             // the arrows SVG.
             const row = $("<tr>").
@@ -69,7 +71,7 @@ class AsmView {
             const rowMeta = {elt: row, i: rows.length, width: 1, arrows: []};
             rows.push(rowMeta);
             pcToRow.set(inst.PC, rowMeta);
-            pcRanges.push([inst.PC, 0, rowMeta.i]);
+            pcRanges.push([pc, 0, rowMeta.i]);
 
             // Add a gap after strict block terminators.
             if (inst.Control.Type != 0) {
@@ -88,7 +90,7 @@ class AsmView {
         for (let i = 1; i < pcRanges.length; i++) {
             pcRanges[i-1][1] = pcRanges[i][0];
         }
-        pcRanges[pcRanges.length-1][1] = data.LastPC;
+        pcRanges[pcRanges.length-1][1] = new AddrJS(data.LastPC);
         this._pcs = new IntervalMap(pcRanges);
 
         // Collect control-flow arrows.

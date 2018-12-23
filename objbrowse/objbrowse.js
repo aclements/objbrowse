@@ -13,13 +13,13 @@ function highlightRanges(ranges, cause) {
         sourceView.highlightRanges(ranges, cause !== sourceView);
 }
 
-// IntervalMap is a map of intervals.
+// IntervalMap is a map of intervals over AddrJS values.
 class IntervalMap {
     // ranges must be an array of [low, high, ...] arrays, where ...
     // can be any additional data the caller wishes to store.
     constructor(ranges) {
         // Sort ranges.
-        ranges.sort((a, b) => compareAddr(a[0], b[0]));
+        ranges.sort((a, b) => a[0].compare(b[0]));
         this.ranges = ranges;
     }
 
@@ -43,69 +43,8 @@ class IntervalMap {
     }
 
     static overlap(r1, r2) {
-        return compareAddr(r1[1], r2[0]) > 0 && compareAddr(r1[0], r2[1]) < 0;
+        return r1[1].compare(r2[0]) > 0 && r1[0].compare(r2[1]) < 0;
     }
-}
-
-// Compare two AddrJS values.
-function compareAddr(a, b) {
-    if (a.length != b.length) {
-        return a.length - b.length;
-    }
-    if (a < b)
-        return -1;
-    else if (a > b)
-        return 1;
-    return 0;
-}
-
-// subAddr computes a-b where a, and the result are AddrJS values.
-// bits is the maximum number of bits in the result (only relevant if
-// there is wraparound).
-function subAddr(a, b, bits) {
-    // Process 16 bits at a time.
-    const digits = 4;
-    const outDigits = Math.floor((bits + 3) / 4);
-    let out = "";
-    let borrow = false;
-    while (a.length > 0 || b.length > 0 || (borrow && out.length < outDigits)) {
-        let ax = a.substr(a.length - digits);
-        let bx = b.substr(b.length - digits);
-        a = a.substring(0, a.length - digits);
-        b = b.substring(0, b.length - digits);
-        if (ax.length == 0) {
-            ax = 0;
-        } else {
-            ax = parseInt(ax, 16);
-        }
-        if (bx.length == 0) {
-            bx = 0;
-        } else {
-            bx = parseInt(bx, 16);
-        }
-
-        if (borrow) {
-            bx++;
-        }
-
-        borrow = ax < bx;
-        if (borrow) {
-            // Borrow.
-            ax += 1<<(4*digits);
-        }
-
-        let ox = ax - bx;
-        out = ox.toString(16).padStart(digits, "0") + out;
-    }
-
-    // Trim to outDigits.
-    out = out.substr(out.length - outDigits);
-
-    // Trim leading 0s.
-    let trim = 0;
-    for (; trim < out.length-1 && out[trim] == "0"; trim++);
-    out = out.substring(trim);
-    return out;
 }
 
 // AddrJS works in 28 bit digits because Javascript treats numbers as
@@ -114,6 +53,8 @@ function subAddr(a, b, bits) {
 const AddrJSBits = 28;
 const AddrJSDigits = AddrJSBits / 4;
 
+// AddrJS is a positive arbitrary precision integer, used for
+// representing memory addresses.
 class AddrJS {
     // AddrJS optionally takes a hex string or a number.
     //
@@ -154,8 +95,6 @@ class AddrJS {
         this._digits = digits;
     }
 
-    // TODO: Move compareAddr and subAddr in here.
-
     _trim() {
         const d = this._digits;
         while (d.length > 0 && d[d.length-1] == 0)
@@ -180,6 +119,22 @@ class AddrJS {
             shift += AddrJSBits;
         }
         return n;
+    }
+
+    // compare returns -1 if this < b, 0 if this == b, and 1 if this > b.
+    compare(b) {
+        const x = this._digits, y = b._digits;
+        if (x.length < y.length)
+            return -1;
+        if (x.length > y.length)
+            return 1;
+        for (let i = x.length - 1; i >= 0; i--) {
+            if (x[i] < y[i])
+                return -1;
+            if (x[i] > y[i])
+                return 1;
+        }
+        return 0;
     }
 
     // add return this + b as a new AddrJS value.
