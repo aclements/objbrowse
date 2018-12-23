@@ -100,6 +100,10 @@ func (v *SourceView) DecodeSym(fi *FileInfo, sym obj.Sym) (interface{}, error) {
 	// TODO(austin): Maybe the UI should have a way to get more
 	// source context on demand (or this could send whole files).
 
+	if sym.Kind != obj.SymText {
+		return nil, nil
+	}
+
 	// Find sym.
 	cu := v.addrToCU(sym.Value)
 	if cu == nil {

@@ -48,6 +48,10 @@ type ControlJS struct {
 func (v *AsmView) DecodeSym(sym obj.Sym, data []byte) (interface{}, error) {
 	var info AsmViewJS
 
+	if sym.Kind != obj.SymText {
+		return nil, nil
+	}
+
 	insts, err := asm.Disasm(v.fi.Obj.Info().Arch, data, sym.Value)
 	if err != nil {
 		return nil, err

@@ -5,8 +5,12 @@
 "use strict";
 
 function highlightRanges(ranges, cause) {
-    asmView.highlightRanges(ranges, cause !== asmView);
-    sourceView.highlightRanges(ranges, cause !== sourceView);
+    if (hexView)
+        hexView.highlightRanges(ranges, cause !== hexView);
+    if (asmView)
+        asmView.highlightRanges(ranges, cause !== asmView);
+    if (sourceView)
+        sourceView.highlightRanges(ranges, cause !== sourceView);
 }
 
 // IntervalMap is a map of intervals.
@@ -104,6 +108,118 @@ function subAddr(a, b, bits) {
     return out;
 }
 
+// AddrJS works in 28 bit digits because Javascript treats numbers as
+// signed 32 bit values and we need something that divides evenly into
+// hex digits.
+const AddrJSBits = 28;
+const AddrJSDigits = AddrJSBits / 4;
+
+class AddrJS {
+    // AddrJS optionally takes a hex string or a number.
+    //
+    // TODO: Support negative numbers.
+    constructor(x, _digits) {
+        if (_digits !== undefined) {
+            this._digits = _digits;
+            this._trim();
+            return;
+        }
+        if (x === undefined || x == 0) {
+            this._digits = [];
+            return;
+        }
+
+        let digits = [];
+        const typ = Object.prototype.toString.call(x);
+        switch (typ) {
+        case "[object String]":
+            for (let i = 0; i < x.length; i += AddrJSDigits) {
+                let end = x.length - i;
+                let start = end - AddrJSDigits;
+                if (start < 0) start = 0;
+                const part = x.substring(start, end);
+                digits.push(parseInt(part, 16));
+            }
+            break;
+        case "[object Number]":
+            const mask = (1<<AddrJSBits) - 1;
+            while (x > 0) {
+                digits.push(x & mask);
+                x = x >> AddrJSBits;
+            }
+            break
+        default:
+            throw "not a string or number";
+        }
+        this._digits = digits;
+    }
+
+    // TODO: Move compareAddr and subAddr in here.
+
+    _trim() {
+        const d = this._digits;
+        while (d.length > 0 && d[d.length-1] == 0)
+            d.pop();
+    }
+
+    toString() {
+        const d = this._digits;
+        if (d.length == 0)
+            return "0";
+        let i = d.length - 1;
+        let out = d[i].toString(16);
+        for (i--; i >= 0; i--)
+            out += d[i].toString(16).padStart(AddrJSDigits, "0");
+        return out;
+    }
+
+    toNumber() {
+        let n = 0, shift = 0;
+        for (let digit of this._digits) {
+            n += digit << shift
+            shift += AddrJSBits;
+        }
+        return n;
+    }
+
+    // add return this + b as a new AddrJS value.
+    add(b) {
+        const x = this._digits, y = b._digits;
+        const digits = Math.max(x.length, y.length);
+
+        let carry = 0;
+        let out = [];
+        for (let i = 0; i < digits; i++) {
+            let o = (x[i] || 0) + (y[i] || 0) + carry;
+            carry = o >> AddrJSBits;
+            o = o & ((1 << AddrJSBits) - 1);
+            out.push(o);
+        }
+        out.push(carry);
+
+        return new AddrJS(undefined, out);
+    }
+
+    // sub return this - b as a new AddrJS value.
+    sub(b) {
+        const x = this._digits, y = b._digits;
+        const digits = Math.max(x.length, y.length);
+
+        let borrow = 0;
+        let out = [];
+        for (let i = 0; i < digits; i++) {
+            let xx = x[i] || 0;
+            let yy = (y[i] || 0) + borrow;
+            borrow = (xx < yy) + 0;
+            xx += borrow<<AddrJSBits;
+            out.push(xx - yy);
+        }
+        if (borrow)
+            throw("negative result");
+        return new AddrJS(undefined, out);
+    }
+}
+
 class Panels {
     constructor(container) {
         this._c = $("<div>").css({position: "relative", height: "100%", display: "flex"});
@@ -135,9 +251,12 @@ function scrollTo(container, elt) {
 
 var asmView;
 var sourceView;
+var hexView;
 
 function render(container, info) {
     const panels = new Panels(container);
+    if (info.HexView)
+        hexView = new HexView(info.HexView, panels.addCol());
     if (info.AsmView)
         asmView = new AsmView(info.AsmView, panels.addCol());
     if (info.SourceView)

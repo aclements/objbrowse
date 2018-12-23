@@ -40,6 +40,7 @@ func main() {
 type state struct {
 	bin        obj.Obj
 	symTab     *symtab.Table
+	hexView    *HexView
 	asmView    *AsmView
 	sourceView *SourceView
 }
@@ -68,10 +69,11 @@ func open() *state {
 
 	// TODO: Do something with the error.
 	fi := &FileInfo{bin}
+	hexView := NewHexView(fi)
 	asmView, _ := NewAsmView(fi, symTab)
 	sourceView, _ := NewSourceView(fi)
 
-	return &state{bin, symTab, asmView, sourceView}
+	return &state{bin, symTab, hexView, asmView, sourceView}
 }
 
 func (s *state) serve() {
@@ -81,8 +83,9 @@ func (s *state) serve() {
 	}
 	http.HandleFunc("/", s.httpMain)
 	http.Handle("/objbrowse.js", http.FileServer(http.Dir("")))
-	http.Handle("/sourceview.js", http.FileServer(http.Dir("")))
+	http.Handle("/hexview.js", http.FileServer(http.Dir("")))
 	http.Handle("/asmview.js", http.FileServer(http.Dir("")))
+	http.Handle("/sourceview.js", http.FileServer(http.Dir("")))
 	http.HandleFunc("/s/", s.httpSym)
 	addr := "http://" + ln.Addr().String()
 	fmt.Printf("Listening on %s\n", addr)
@@ -130,11 +133,7 @@ func (a AddrJS) MarshalJSON() ([]byte, error) {
 type SymInfo struct {
 	Title string
 
-	// Insts  []Disasm
-	// LastPC AddrJS
-
-	// Liveness interface{} `json:",omitempty"`
-
+	HexView    interface{} `json:",omitempty"`
 	AsmView    interface{} `json:",omitempty"`
 	SourceView interface{} `json:",omitempty"`
 }
@@ -191,6 +190,15 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Process HexView.
+	hv, err := s.hexView.DecodeSym(sym, data)
+	if err != nil {
+		// TODO: Display this to the user.
+		log.Print(err)
+	} else {
+		info.HexView = hv
+	}
+
 	// Process AsmView.
 	av, err := s.asmView.DecodeSym(sym, data)
 	if err != nil {
@@ -235,6 +243,8 @@ var tmplSym = template.Must(template.New("").Parse(`
   }
   td.pos + td:not(.pos) { border-left: #eee 1px solid; }
 
+  .hv-data { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }
+
   .disasm { border-spacing: 0; }
   .disasm td { padding: 0 .5em; }
   .disasm th { padding: 0 .5em; }
@@ -262,8 +272,9 @@ var tmplSym = template.Must(template.New("").Parse(`
   </defs>
 </svg>
 <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-<script src="/sourceview.js"></script>
+<script src="/hexview.js"></script>
 <script src="/asmview.js"></script>
+<script src="/sourceview.js"></script>
 <script src="/objbrowse.js"></script>
 <script>render(document.body, {{$}})</script>
 </body></html>
