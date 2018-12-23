@@ -90,6 +90,7 @@ func (f *elfFile) Symbols() ([]Sym, error) {
 		sym := Sym{s.Name, s.Value, s.Size, kind, local, int(s.Section)}
 		out = append(out, sym)
 	}
+	synthesizeSizes(out)
 	return out, nil
 }
 

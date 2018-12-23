@@ -8,6 +8,7 @@ import (
 	"debug/dwarf"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/aclements/objbrowse/internal/arch"
 )
@@ -63,4 +64,20 @@ func Open(r io.ReaderAt) (Obj, error) {
 		return f, nil
 	}
 	return nil, fmt.Errorf("unrecognized object file format")
+}
+
+// Assign sizes to 0-sized symbols based on the offset to the next
+// symbol.
+func synthesizeSizes(syms []Sym) {
+	// Sort by address.
+	sort.Slice(syms, func(i, j int) bool {
+		return syms[i].Value < syms[j].Value
+	})
+
+	// Assign size to 0-sized symbols.
+	for i := range syms {
+		if syms[i].Size == 0 && syms[i].Kind != SymUndef && i+1 < len(syms) {
+			syms[i].Size = syms[i+1].Value - syms[i].Value
+		}
+	}
 }
