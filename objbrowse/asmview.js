@@ -192,7 +192,7 @@ class AsmView {
 
         // Add liveness.
         if (data.Liveness)
-            renderLiveness(data.Liveness, this._pcs, tableInfo);
+            new LivenessOverlay(data.Liveness).render(tableInfo, this._pcs);
     }
 
     static _formatArgs(args) {

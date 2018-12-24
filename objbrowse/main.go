@@ -86,6 +86,7 @@ func (s *state) serve() {
 	http.Handle("/hexview.js", http.FileServer(http.Dir("")))
 	http.Handle("/asmview.js", http.FileServer(http.Dir("")))
 	http.Handle("/sourceview.js", http.FileServer(http.Dir("")))
+	http.Handle("/liveness.js", http.FileServer(http.Dir("")))
 	http.HandleFunc("/s/", s.httpSym)
 	addr := "http://" + ln.Addr().String()
 	fmt.Printf("Listening on %s\n", addr)
@@ -277,6 +278,7 @@ var tmplSym = template.Must(template.New("").Parse(`
 <script src="/hexview.js"></script>
 <script src="/asmview.js"></script>
 <script src="/sourceview.js"></script>
+<script src="/liveness.js"></script>
 <script src="/objbrowse.js"></script>
 <script>render(document.body, {{$}})</script>
 </body></html>
