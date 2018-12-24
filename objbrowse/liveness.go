@@ -46,14 +46,31 @@ type LivenessJS struct {
 	// architecture.
 	VarpDelta, ArgpDelta int
 
-	// SP offset for each instruction.
-	SPOff []int
+	// SP offsets.
+	SPOff []LivenessRangeJS
 
-	// Bitmap index for each instruction.
-	Indexes []int
+	// Bitmap indexes.
+	Indexes []LivenessRangeJS
 
 	// Hex-encoded locals and args bitmaps
 	Locals, Args []string
+}
+
+type LivenessRangeJS struct {
+	Start AddrJS `json:"start"`
+	End   AddrJS `json:"end"`
+	Val   int32  `json:"val"`
+}
+
+func pcTableToJS(t functab.PCTable) []LivenessRangeJS {
+	var out []LivenessRangeJS
+	for i, val := range t.Values {
+		if t.Missing != nil && t.Missing[i] {
+			continue
+		}
+		out = append(out, LivenessRangeJS{AddrJS(t.PCs[i]), AddrJS(t.PCs[i+1]), val})
+	}
+	return out
 }
 
 func (o *LivenessOverlay) liveness(sym obj.Sym, insts asm.Seq) (interface{}, error) {
@@ -84,27 +101,10 @@ func (o *LivenessOverlay) liveness(sym obj.Sym, insts asm.Seq) (interface{}, err
 	for _, bitmap := range liveness.Args {
 		l.Args = append(l.Args, bitmap.Hex())
 	}
+	l.Indexes = pcTableToJS(liveness.Index)
 
-	// Decode SP offset and index at each instruction.
-	pcsp := fn.PCSP.Decode()
-	for i := 0; i < insts.Len(); i++ {
-		inst := insts.Get(i)
-		spOffset, ok := pcsp.Lookup(inst.PC())
-		if !ok {
-			spOffset = -1
-		}
-		l.SPOff = append(l.SPOff, int(spOffset))
-
-		stackIdx, ok := liveness.Index.Lookup(inst.PC())
-		if stackIdx < -1 || len(liveness.Index.PCs) == 0 {
-			// Not a safe-point, or no liveness info.
-			stackIdx = -1
-		} else if stackIdx == -1 {
-			// By convention, this actually means index 0.
-			stackIdx = 0
-		}
-		l.Indexes = append(l.Indexes, int(stackIdx))
-	}
+	// Decode SP offsets.
+	l.SPOff = pcTableToJS(fn.PCSP.Decode())
 
 	return l, nil
 }

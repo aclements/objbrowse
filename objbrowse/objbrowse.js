@@ -15,17 +15,44 @@ class IntervalMap {
         this.ranges = ranges;
     }
 
+    // _find returns the index of the first range that ends after val.
+    // It may or may not contain val.
+    _find(val) {
+        let lo = 0, hi = this.ranges.length;
+        while (lo < hi) {
+            let mid = Math.floor((lo + hi) / 2);
+            if (this.ranges[mid].end > val)
+                hi = mid;
+            else
+                lo = mid + 1;
+        }
+        return lo;
+    }
+
+    // get returns the range object containing val, if any, or null.
+    get(val) {
+        let i = this._find(val);
+        if (i < this.ranges.length && this.ranges[i].start <= val)
+            return this.ranges[i];
+        return null;
+    }
+
     // Intersect a list of ranges with the ranges in this map and
     // return the subset that overlap. ranges must already be sorted.
     intersect(ranges) {
         const out = [];
-        let i = 0, j = 0;
-        while (i < ranges.length && j < this.ranges.length) {
-            if (IntervalMap.overlap(ranges[i], this.ranges[j])) {
+        if (ranges.length == 0)
+            return out;
+        const end = ranges[ranges.length-1].end;
+        let i = this._find(ranges[0].start), j = 0;
+        while (i < this.ranges.length && j < ranges.length) {
+            if (this.ranges[i].start >= end)
+                break;
+            if (IntervalMap.overlap(this.ranges[i], ranges[j])) {
                 // Found a match.
-                out.push(this.ranges[j]);
-                j++;
-            } else if (ranges[i].start < this.ranges[j].start) {
+                out.push(this.ranges[i]);
+                i++;
+            } else if (this.ranges[i].start < ranges[j].start) {
                 i++;
             } else {
                 j++;
@@ -34,8 +61,49 @@ class IntervalMap {
         return out;
     }
 
+    // intersectJoin calls fn(r1, r2, rout) for each range r1 that
+    // appears in this IntervalMap and r2 that appears in IntervalMap
+    // b, where r1 and r2 overlap. fn may add fields to rout, which is
+    // initially the range that overlaps between r1 and r2.
+    // intersectJoin returns the IntervalMap consisting of rout
+    // values.
+    intersectJoin(b, fn) {
+        const out = [];
+        let i = 0, j = 0;
+        while (i < this.ranges.length && j < b.ranges.length) {
+            const r1 = this.ranges[i], r2 = b.ranges[j];
+            const rout = IntervalMap.intersection(r1, r2);
+            if (rout !== null) {
+                // Found an intersection.
+                fn(r1, r2, rout);
+                out.push(rout);
+                if (r1.end == rout.end)
+                    i++;
+                if (r2.end == rout.end)
+                    j++;
+            } else if (this.ranges[i].start < b.ranges[j].start) {
+                i++;
+            } else {
+                j++;
+            }
+        }
+        return new IntervalMap(out);
+    }
+
     static overlap(r1, r2) {
         return r1.end.compare(r2.start) > 0 && r1.start.compare(r2.end) < 0;
+    }
+
+    static intersection(r1, r2) {
+        let start = r1.start;
+        if (start.compare(r2.start) < 0)
+            start = r2.start;
+        let end = r1.end;
+        if (end.compare(r2.end) > 0)
+            end = r2.end;
+        if (start.compare(end) < 0)
+            return {start: start, end: end};
+        return null;
     }
 }
 
@@ -271,7 +339,19 @@ function parseRanges(ranges) {
     return out;
 }
 
-function renderLiveness(info, insts, table, rows) {
+// renderLiveness adds liveness data from info. rowMap is an
+// IntervalMap from addresses to rows, where each value has a "tr"
+// property that is a DOM "tr" element. "table" is an object with
+// "header" and "groupHeader" properties.
+function renderLiveness(info, rowMap, table) {
+    // TODO: Make this lazy, as it can be quite expensive even for
+    // reasonably sized functions. Maybe I should generalize LazyTable
+    // so that rather than having a fixed block size, it renders
+    // enough rows to fill the screen, plus as many more as it can do
+    // under some time bound. Alternatively, I could fill in the whole
+    // table, but allow browser refreshes regularly during the
+    // process.
+
     const ptrSize = info.PtrSize;
 
     // Decode live bitmaps.
@@ -281,73 +361,85 @@ function renderLiveness(info, insts, table, rows) {
     for (const bm of info.Args)
         args.push(parseBitmap(bm));
 
-    // Compute varp/argp and covered range.
+    // Create interval maps for SP offset and bitmap indexes.
+    function mkMap(json) {
+        for (let r of json) {
+            r.start = new AddrJS(r.start);
+            r.end = new AddrJS(r.end);
+        }
+        return new IntervalMap(json);
+    }
+    const spOff = mkMap(info.SPOff);
+    const indexes = mkMap(info.Indexes);
+
+    // Join the two maps to compute varp/argp/localp.
     var liveMin = 0xffffffff;
     var liveMax = 0;
     var argMin = 0xffffffff;
     var argMax = 0;
-    const iextra = []; // Extra per-instruction info
-    for (let i = 0; i < insts.length; i++) {
-        const spoff = info.SPOff[i];
-        iextra[i] = {
-            varp: info.VarpDelta + spoff,
-            argp: info.ArgpDelta + spoff,
-        };
+    const lmap = spOff.intersectJoin(indexes, function(sp, index, out) {
+        out.spOff = sp.val;
+        out.index = index.val;
+        out.varp = info.VarpDelta + sp.val;
+        out.argp = info.ArgpDelta + sp.val;
 
-        // SPOff -1 indicates unknown SP offset. SPOff 0 happens at
-        // RET, where we don't bother resetting the liveness index,
-        // but if the frame is 0 bytes, it can't have liveness.
-        if (spoff <= 0)
-            continue;
-
-        const index = info.Indexes[i];
-        if (index < 0)
-            continue;
-        if (iextra[i].varp > 0) {
-            iextra[i].localp = iextra[i].varp - locals[index].n * ptrSize;
-            liveMin = Math.min(liveMin, iextra[i].localp);
-            liveMax = Math.max(liveMax, iextra[i].varp);
+        if (out.varp > 0) {
+            out.localp = out.varp - locals[index.val].n * ptrSize;
+            liveMin = Math.min(liveMin, out.localp);
+            liveMax = Math.max(liveMax, out.varp);
         }
-        if (iextra[i].argp > 0) {
-            argMin = Math.min(argMin, iextra[i].argp);
-            argMax = Math.max(argMax, iextra[i].argp + args[index].n * ptrSize);
+        if (out.argp > 0) {
+            argMin = Math.min(argMin, out.argp);
+            argMax = Math.max(argMax, out.argp + args[index.val].n * ptrSize);
         }
-    }
+    });
     const haveArgs = argMin < argMax;
 
     // Create table header.
     if (liveMin < liveMax)
-        table.groupHeader.append($("<th>").text("locals").addClass("flag").attr("colspan", (liveMax - liveMin) / ptrSize));
+        $(table.groupHeader).append($("<th>").text("locals").addClass("flag").attr("colspan", (liveMax - liveMin) / ptrSize));
     if (haveArgs) {
-        table.groupHeader.append($("<th>"));
-        table.groupHeader.append($("<th>").text("args").addClass("flag").attr("colspan", (argMax - argMin) / ptrSize));
+        $(table.groupHeader).append($("<th>"));
+        $(table.groupHeader).append($("<th>").text("args").addClass("flag").attr("colspan", (argMax - argMin) / ptrSize));
     }
 
     for (let i = liveMin; i < liveMax; i += ptrSize)
-        table.header.append($("<th>").text("0x"+i.toString(16)).addClass("flag"));
+        $(table.header).append($("<th>").text("0x"+i.toString(16)).addClass("flag"));
     if (haveArgs) {
-        table.header.append($("<th>").text("|").addClass("flag"));
+        $(table.header).append($("<th>").text("|").addClass("flag"));
         for (let i = argMin; i < argMax; i += ptrSize)
-            table.header.append($("<th>").text("0x"+i.toString(16)).addClass("flag"));
+            $(table.header).append($("<th>").text("0x"+i.toString(16)).addClass("flag"));
     }
 
     // Create table cells.
-    for (var i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const index = info.Indexes[i];
-        const addBit = function(addr, bitmap, base) {
-            const i = (addr - base) / ptrSize;
-            var text = "";
-            if (bitmap !== undefined && 0 <= i && i < bitmap.n)
-                text = bitmap.bit(i) ? "P" : "-";
-            row.elt.append($("<td>").text(text).addClass("flag"));
+    for (let r of rowMap.ranges) {
+        const ls = lmap.intersect([r]);
+        const tr = $(r.tr);
+        const addBit = function(addr, bitmapSet, spProp) {
+            // Join together the bits from each liveness map at this row.
+            let text = "";
+            for (let l of ls) {
+                const bitmap = bitmapSet[l.index];
+                const bmi = (addr - l[spProp]) / ptrSize;
+                let thisText;
+                if (bmi < 0 || bmi >= bitmap.n)
+                    thisText = "-";
+                else
+                    thisText = bitmap.bit(bmi) ? "P" : "-";
+                if (text == "")
+                    text = thisText;
+                else if (text != thisText)
+                    text = "?";
+            }
+            // Add table cell.
+            tr.append($("<td>").text(text).addClass("flag"));
         };
         for (let addr = liveMin; addr < liveMax; addr += ptrSize)
-            addBit(addr, locals[index], iextra[i].localp);
+            addBit(addr, locals, "localp");
         if (haveArgs) {
-            row.elt.append($("<td>"));
+            tr.append($("<td>"));
             for (let addr = argMin; addr < argMax; addr += ptrSize)
-                addBit(addr, args[index], iextra[i].argp);
+                addBit(addr, args, "argp");
         }
     }
 }

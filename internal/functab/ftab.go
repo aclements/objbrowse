@@ -145,6 +145,8 @@ func (f Func) Liveness() (Liveness, error) {
 	if len(f.PCData) <= _PCDATA_StackMapIndex {
 		return Liveness{}, nil
 	}
+
+	// Fetch the pointer bitmaps.
 	args, err := f.FuncData[_FUNCDATA_ArgsPointerMaps].StackMap()
 	if err != nil {
 		return Liveness{}, nil
@@ -153,7 +155,41 @@ func (f Func) Liveness() (Liveness, error) {
 	if err != nil {
 		return Liveness{}, nil
 	}
-	return Liveness{
-		f.PCData[_PCDATA_StackMapIndex].Decode(), args, locals,
-	}, nil
+
+	// Fetch the stack map index.
+	stackMap := f.PCData[_PCDATA_StackMapIndex].Decode()
+
+	// Apply runtime conventions to the stack map.
+	if len(stackMap.PCs) > 0 {
+		// Index -1 actually means index 0.
+		for i, v := range stackMap.Values {
+			if v == -1 {
+				stackMap.Values[i] = 0
+			}
+		}
+
+		// If there's any stack map, then the runtime uses
+		// stack map 0 up to the first entry.
+		if stackMap.PCs[0] > f.PC {
+			if stackMap.Values[0] == 0 {
+				stackMap.PCs[0] = f.PC
+			} else {
+				stackMap.PCs = append([]uint64{f.PC}, stackMap.PCs...)
+				stackMap.Values = append([]int32{0}, stackMap.Values...)
+			}
+		}
+
+		// Index -2 means "not a safe point" (i.e., no stack
+		// map).
+		for i, v := range stackMap.Values {
+			if v == -2 {
+				if stackMap.Missing == nil {
+					stackMap.Missing = make([]bool, len(stackMap.Values))
+				}
+				stackMap.Missing[i] = true
+			}
+		}
+	}
+
+	return Liveness{stackMap, args, locals}, nil
 }

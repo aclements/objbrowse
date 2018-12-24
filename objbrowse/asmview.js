@@ -71,7 +71,7 @@ class AsmView {
             const rowMeta = {elt: row, i: rows.length, width: 1, arrows: []};
             rows.push(rowMeta);
             pcToRow.set(inst.PC, rowMeta);
-            pcRanges.push({start: pc, end: null, i: rowMeta.i});
+            pcRanges.push({start: pc, end: null, i: rowMeta.i, tr: row[0]});
 
             // Add a gap after strict block terminators.
             if (inst.Control.Type != 0) {
@@ -192,7 +192,7 @@ class AsmView {
 
         // Add liveness.
         if (data.Liveness)
-            renderLiveness(data.Liveness, data.Insts, tableInfo, rows);
+            renderLiveness(data.Liveness, this._pcs, tableInfo);
     }
 
     static _formatArgs(args) {
