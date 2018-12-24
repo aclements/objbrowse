@@ -1,0 +1,9 @@
+Turn objbrowse into a package so it's easy to assemble a custom
+browser with custom views and overlays. There should be a package for
+the basic framework, and packages for the default views and overlays.
+
+Put a nice symbol browser into a navigation panel. This may make the
+whole thing a single-page experience.
+
+Make it possible to hide and show view and turn overlays on and off.
+Maybe make it possible to adjust their width.
