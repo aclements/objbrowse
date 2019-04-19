@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/aclements/objbrowse/internal/obj"
@@ -19,8 +20,21 @@ import (
 )
 
 var (
-	httpFlag = flag.String("http", "localhost:0", "HTTP service address (e.g., ':6060')")
+	httpFlag   = flag.String("http", "localhost:0", "HTTP service address (e.g., ':6060')")
+	flagStatic = flag.String("static", defaultStatic(), "`path` to static files")
 )
+
+func defaultStatic() string {
+	path, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	path2, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		path2 = path
+	}
+	return filepath.Dir(path2)
+}
 
 func main() {
 	flag.Usage = func() {
@@ -30,6 +44,10 @@ func main() {
 	flag.Parse()
 	if flag.NArg() != 1 {
 		flag.Usage()
+		os.Exit(2)
+	}
+	if *flagStatic == "" {
+		fmt.Fprintf(os.Stderr, "Unable to find static resources.\nPlease provide -static flag.\n")
 		os.Exit(2)
 	}
 
@@ -82,11 +100,11 @@ func (s *state) serve() {
 		log.Fatalf("failed to create server socket: %v", err)
 	}
 	http.HandleFunc("/", s.httpMain)
-	http.Handle("/objbrowse.js", http.FileServer(http.Dir("")))
-	http.Handle("/hexview.js", http.FileServer(http.Dir("")))
-	http.Handle("/asmview.js", http.FileServer(http.Dir("")))
-	http.Handle("/sourceview.js", http.FileServer(http.Dir("")))
-	http.Handle("/liveness.js", http.FileServer(http.Dir("")))
+	http.Handle("/objbrowse.js", http.FileServer(http.Dir(*flagStatic)))
+	http.Handle("/hexview.js", http.FileServer(http.Dir(*flagStatic)))
+	http.Handle("/asmview.js", http.FileServer(http.Dir(*flagStatic)))
+	http.Handle("/sourceview.js", http.FileServer(http.Dir(*flagStatic)))
+	http.Handle("/liveness.js", http.FileServer(http.Dir(*flagStatic)))
 	http.HandleFunc("/s/", s.httpSym)
 	addr := "http://" + ln.Addr().String()
 	fmt.Printf("Listening on %s\n", addr)
