@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/aclements/go-moremath/graph/graphalg"
 	"github.com/aclements/objbrowse/internal/asm"
-	"github.com/aclements/objbrowse/internal/graph"
 )
 
 type Func struct {
@@ -99,11 +99,11 @@ func SSA(seq asm.Seq, asmBlocks []*asm.BasicBlock) *Func {
 	fn := &Func{seq, blocks}
 
 	// Compute the dominator tree.
-	idom := graph.IDom(asm.BasicBlockGraph(asmBlocks), 0)
-	dom := graph.Dom(idom)
+	idom := graphalg.IDom(asm.BasicBlockGraph(asmBlocks), 0)
+	dom := graphalg.Dom(idom)
 
 	// Compute the dominance frontier for phi placement.
-	df := graph.DomFrontier(asm.BasicBlockGraph(asmBlocks), 0, idom)
+	df := graphalg.DomFrontier(asm.BasicBlockGraph(asmBlocks), 0, idom)
 
 	// Collect the read/write sets of all instructions.
 	type rwSet struct{ r, w []asm.Loc }
