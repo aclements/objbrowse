@@ -69,11 +69,13 @@ func (f *peFile) Symbols() ([]Sym, error) {
 
 	var out []Sym
 	for _, s := range f.pe.Symbols {
-		sym := Sym{s.Name, uint64(s.Value), 0, SymUnknown, false, int(s.SectionNumber)}
+		sym := Sym{s.Name, uint64(s.Value), 0, SymUnknown, false, false, int(s.SectionNumber)}
 		switch s.SectionNumber {
 		case IMAGE_SYM_UNDEFINED:
 			sym.Kind = SymUndef
-		case IMAGE_SYM_ABSOLUTE, IMAGE_SYM_DEBUG:
+		case IMAGE_SYM_ABSOLUTE:
+			sym.Kind = SymAbsolute
+		case IMAGE_SYM_DEBUG:
 			// Leave unknown
 		default:
 			if int(s.SectionNumber)-1 < 0 || int(s.SectionNumber)-1 >= len(f.pe.Sections) {
@@ -96,6 +98,7 @@ func (f *peFile) Symbols() ([]Sym, error) {
 			}
 			sym.Local = s.StorageClass == IMAGE_SYM_CLASS_STATIC
 			sym.Value += f.imageBase + uint64(sect.VirtualAddress)
+			sym.HasAddr = true
 		}
 
 		out = append(out, sym)

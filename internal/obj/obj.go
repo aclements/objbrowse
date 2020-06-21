@@ -40,19 +40,25 @@ type Sym struct {
 	Name        string
 	Value, Size uint64
 	Kind        SymKind
-	Local       bool
-	section     int
+	// Local indicates this symbol's name is only meaningful
+	// within its compilation unit.
+	Local bool
+	// HasAddr indicates this symbol's Value is a meaningful
+	// address in the loaded object.
+	HasAddr bool
+	section int
 }
 
 type SymKind uint8
 
 const (
-	SymUnknown SymKind = '?'
-	SymText            = 'T'
-	SymData            = 'D'
-	SymROData          = 'R'
-	SymBSS             = 'B'
-	SymUndef           = 'U'
+	SymUnknown  SymKind = '?'
+	SymText             = 'T'
+	SymData             = 'D'
+	SymROData           = 'R'
+	SymBSS              = 'B'
+	SymUndef            = 'U'
+	SymAbsolute         = 'A'
 )
 
 // Open attempts to open r as a known object file format.

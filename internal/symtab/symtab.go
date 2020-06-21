@@ -86,6 +86,12 @@ func (t *Table) Addr(addr uint64) (obj.Sym, bool) {
 		if sym.Value > addr {
 			break
 		}
+		if !sym.HasAddr {
+			// This symbol's value isn't an address. For
+			// example, this is an absolute symbol or a
+			// TLS symbol.
+			continue
+		}
 		if best == -1 && addr < sym.Value+sym.Size {
 			best = i + j
 		}
@@ -107,9 +113,12 @@ func (t *Table) Addr(addr uint64) (obj.Sym, bool) {
 // SymName returns the name and base of the symbol containing addr. It
 // returns "", 0 if no symbol contains addr.
 //
+// This ignores symbols at address 0, since those tend to not be
+// "real" symbols and can cause small integers to get symbolized.
+//
 // This is useful for x/arch disassembly functions.
 func (t *Table) SymName(addr uint64) (name string, base uint64) {
-	if sym, ok := t.Addr(addr); ok {
+	if sym, ok := t.Addr(addr); ok && sym.Value != 0 {
 		return sym.Name, sym.Value
 	}
 	return "", 0

@@ -65,11 +65,16 @@ func (f *elfFile) Symbols() ([]Sym, error) {
 	var out []Sym
 	for _, s := range syms {
 		kind := SymUnknown
+		hasAddr := true
 		switch s.Section {
 		case elf.SHN_UNDEF:
 			kind = SymUndef
+			hasAddr = false
 		case elf.SHN_COMMON:
 			kind = SymBSS
+		case elf.SHN_ABS:
+			kind = SymAbsolute
+			hasAddr = false
 		default:
 			if s.Section < 0 || s.Section >= elf.SectionIndex(len(f.elf.Sections)) {
 				// Ignore symbol.
@@ -86,8 +91,16 @@ func (f *elfFile) Symbols() ([]Sym, error) {
 			}
 		}
 		local := elf.ST_BIND(s.Info) == elf.STB_LOCAL
+		switch elf.ST_TYPE(s.Info) {
+		case elf.STT_FILE, elf.STT_TLS:
+			// STT_FILE symbols should also be absolute,
+			// but we check just in case. STT_TLS symbols
+			// have TLS-relative addresses, not regular
+			// addresses.
+			hasAddr = false
+		}
 
-		sym := Sym{s.Name, s.Value, s.Size, kind, local, int(s.Section)}
+		sym := Sym{s.Name, s.Value, s.Size, kind, local, hasAddr, int(s.Section)}
 		out = append(out, sym)
 	}
 	synthesizeSizes(out)
