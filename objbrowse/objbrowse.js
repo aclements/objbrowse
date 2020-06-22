@@ -235,6 +235,115 @@ class AddrJS {
     }
 }
 
+// A LazyTable populates a <table> element as rows come into view.
+//
+// The caller must create a <table> element and may populate headers
+// and initial rows. LazyTable then reserves "lines" ems of vertical
+// space in the table for "lines" table rows. These rows will be
+// created on demand in chunks of at most "blockLines" by calling
+// makeRows. makeRows must take a starting row number and a number of
+// rows and return a slice of <tr> elements.
+//
+// Once created, the caller should no longer directly modify the
+// contents of the <table>. It may remove the <table> from the DOM
+// entirely.
+class LazyTable {
+    constructor(table, lines, blockLines, makeRows) {
+        const self = this;
+
+        this._lines = lines;
+        this._blockLines = blockLines;
+        this._makeRows = makeRows;
+
+        table = $(table);
+        this._table = table[0];
+        // The table must have border collapse or it will rearrange as
+        // we replace blocks with individual rows.
+        table.css({borderCollapse: "collapse"});
+
+        // Fill in blocks as they become visible.
+        let iobv = new IntersectionObserver(this._fillBlocks.bind(this));
+
+        // Create blocks.
+        this._blocks = [];
+        for (let line = 0; line < lines; line += blockLines) {
+            const nLines = Math.min(lines - line, blockLines);
+            const tr = $("<tr>").css("height", nLines + "em");
+            table.append(tr);
+            iobv.observe(tr[0]);
+            this._blocks.push({start: line, length: nLines, rows: null,
+                               tr1: tr[0], tr2: tr[0], filled: false});
+        }
+
+        // Fill in currently visible blocks.
+        this._lastFilled = null;
+        this._fillBlocks();
+    }
+
+    get tableElt() {
+        return this._table;
+    }
+
+    _fillBlocks() {
+        // Fast path: check if the last filled block is the only
+        // visible one.
+        const bottom = $(window).height();
+        if (this._lastFilled !== null) {
+            const r1 = this._lastFilled.tr1.getBoundingClientRect();
+            const r2 = this._lastFilled.tr2.getBoundingClientRect();
+            if (r1.top <= 0 && r2.bottom > bottom)
+                return;
+        }
+        // Find the first block that's visible.
+        let lo = 0, hi = this._blocks.length;
+        while (lo < hi) {
+            let mid = Math.floor((lo + hi) / 2);
+            if (this._blocks[mid].tr2.getBoundingClientRect().bottom > 0)
+                hi = mid;
+            else
+                lo = mid + 1;
+        }
+        // Process all visible blocks.
+        for (let i = lo; i < this._blocks.length; i++) {
+            const block = this._blocks[i];
+            const rect = block.tr1.getBoundingClientRect();
+            if (rect.top > bottom)
+                break;
+            this._ensureBlock(block);
+        }
+    }
+
+    _ensureBlock(block) {
+        if (block.filled)
+            return;
+
+        // Get rows.
+        const rows = this._makeRows.call(null, block.start, block.length);
+
+        // Insert rows after the placeholder.
+        $(rows).insertAfter(block.tr1);
+
+        // Delete placeholder.
+        $(block.tr1).remove();
+
+        // Update block info.
+        block.filled = true;
+        block.rows = rows;
+        this._lastFilled = block;
+        block.tr1 = rows[0];
+        block.tr2 = rows[rows.length-1];
+    }
+
+    getRow(n) {
+        if (n < 0 || n >= this._lines) {
+            return undefined;
+        }
+        const block = this._blocks[Math.floor(n / this._blockLines)];
+        this._ensureBlock(block);
+        return block.rows[n % this._blockLines];
+    }
+}
+
 class Panels {
     constructor(container) {
         this._c = $("<div>").css({position: "relative", height: "100%", display: "flex"});

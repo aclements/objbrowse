@@ -17,11 +17,12 @@ class HexView {
         // Create blocks for every 4K. It takes about 25ms to fill a
         // 4K block (most of which is the browser doing layout), which
         // is unnoticable.
+        const table = $('<table>').appendTo(container);
         const blockBytes = 4 * 1024;
         const length = data.Data.length / 2;
         const lines = Math.ceil(length / 16);
         const blockLines = blockBytes / 16;
-        this._lazyTable = new LazyTable(container, lines, blockLines, this._makeRows.bind(this));
+        this._lazyTable = new LazyTable(table, lines, blockLines, this._makeRows.bind(this));
     }
 
     _makeRows(startLine, nLines) {
@@ -176,103 +177,5 @@ class HexView {
         // Scroll.
         if (firstTR && scroll)
             scrollTo(this._container, firstTR);
-    }
-}
-
-class LazyTable {
-    // LazyTable creates a <table> elements in container that is
-    // "lines" lines tall. The rows will be created on demand in
-    // chunks of at most "blockLines" by calling makeRows. makeRows
-    // must take a starting row number and a number of rows and return
-    // a slice of <tr> elements.
-    constructor(container, lines, blockLines, makeRows) {
-        this._lines = lines;
-        this._blockLines = blockLines;
-        this._makeRows = makeRows;
-
-        const table = $("<table>").css({borderCollapse: "collapse"}).appendTo(container);
-        this._table = table[0];
-
-        // Create blocks.
-        this._blocks = [];
-        for (let line = 0; line < lines; line += blockLines) {
-            const nLines = Math.min(lines - line, blockLines);
-            const tr = $("<tr>").css("height", nLines + "em");
-            table.append(tr);
-            this._blocks.push({start: line, length: nLines, rows: null,
-                               tr1: tr[0], tr2: tr[0], filled: false});
-        }
-
-        // Fill in currently visible blocks.
-        this._lastFilled = null;
-        this._fillBlocks();
-
-        // Fill in blocks on scroll.
-        //
-        // TODO: Remove this if the LazyTable gets deleted.
-        $([window, container]).on('resize scroll', this._fillBlocks.bind(this));
-    }
-
-    get tableElt() {
-        return this._table;
-    }
-
-    _fillBlocks() {
-        // Fast path: check if the last filled block is the only
-        // visible one.
-        const bottom = $(window).height();
-        if (this._lastFilled !== null) {
-            const r1 = this._lastFilled.tr1.getBoundingClientRect();
-            const r2 = this._lastFilled.tr2.getBoundingClientRect();
-            if (r1.top <= 0 && r2.bottom > bottom)
-                return;
-        }
-        // Find the first block that's visible.
-        let lo = 0, hi = this._blocks.length;
-        while (lo < hi) {
-            let mid = Math.floor((lo + hi) / 2);
-            if (this._blocks[mid].tr2.getBoundingClientRect().bottom > 0)
-                hi = mid;
-            else
-                lo = mid + 1;
-        }
-        // Process all visible blocks.
-        for (let i = lo; i < this._blocks.length; i++) {
-            const block = this._blocks[i];
-            const rect = block.tr1.getBoundingClientRect();
-            if (rect.top > bottom)
-                break;
-            this._ensureBlock(block);
-        }
-    }
-
-    _ensureBlock(block) {
-        if (block.filled)
-            return;
-
-        // Get rows.
-        const rows = this._makeRows.call(null, block.start, block.length);
-
-        // Insert rows after the placeholder.
-        $(rows).insertAfter(block.tr1);
-
-        // Delete placeholder.
-        $(block.tr1).remove();
-
-        // Update block info.
-        block.filled = true;
-        block.rows = rows;
-        this._lastFilled = block;
-        block.tr1 = rows[0];
-        block.tr2 = rows[rows.length-1];
-    }
-
-    getRow(n) {
-        if (n < 0 || n >= this._lines) {
-            return undefined;
-        }
-        const block = this._blocks[Math.floor(n / this._blockLines)];
-        this._ensureBlock(block);
-        return block.rows[n % this._blockLines];
     }
 }
