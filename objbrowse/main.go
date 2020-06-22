@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"html/template"
@@ -56,8 +57,10 @@ func main() {
 }
 
 type state struct {
-	bin        obj.Obj
-	symTab     *symtab.Table
+	bin    obj.Obj
+	symTab *symtab.Table
+
+	symView    *SymView
 	hexView    *HexView
 	asmView    *AsmView
 	sourceView *SourceView
@@ -87,11 +90,12 @@ func open() *state {
 
 	// TODO: Do something with the error.
 	fi := &FileInfo{bin}
+	symView := NewSymView(fi, symTab)
 	hexView := NewHexView(fi)
 	asmView, _ := NewAsmView(fi, symTab)
 	sourceView, _ := NewSourceView(fi)
 
-	return &state{bin, symTab, hexView, asmView, sourceView}
+	return &state{bin, symTab, symView, hexView, asmView, sourceView}
 }
 
 func (s *state) serve() {
@@ -103,6 +107,7 @@ func (s *state) serve() {
 	fs := http.FileServer(http.Dir(*flagStatic))
 	http.Handle("/objbrowse.css", fs)
 	http.Handle("/objbrowse.js", fs)
+	http.Handle("/symview.js", fs)
 	http.Handle("/hexview.js", fs)
 	http.Handle("/asmview.js", fs)
 	http.Handle("/sourceview.js", fs)
@@ -114,31 +119,47 @@ func (s *state) serve() {
 	log.Fatalf("failed to start HTTP server: %v", err)
 }
 
+type SymsInfo struct {
+	SymView interface{} `json:",omitempty"`
+}
+
 func (s *state) httpMain(w http.ResponseWriter, r *http.Request) {
-	// TODO: Put this in a nice table.
-	// TODO: Option to sort by name or address.
 	// TODO: More nm-like information (type and maybe value)
-	// TODO: Make hierarchical on "."
+	// TODO: Make hierarchical on "."?
 	// TODO: Filter by symbol type.
-	// TODO: Filter by substring.
 	// TODO: Option to demangle (do hierarchy splitting before demangling)
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
 
-	syms := s.symTab.Syms()
+	var info SymsInfo
+	sv, err := s.symView.Decode()
+	if err != nil {
+		log.Print(err)
+	} else {
+		info.SymView = sv
+	}
 
-	if err := tmplMain.Execute(w, syms); err != nil {
+	if err := tmplMain.Execute(w, info); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
 var tmplMain = template.Must(template.New("").Parse(`<!DOCTYPE html>
-<html><body>
-{{range $s := $}}<a href="/s/{{$s.Name}}">{{printf "%#x" $s.Value}} {{printf "%c" $s.Kind}} {{$s.Name}}</a><br />{{end}}
-</body></html>
+<html>
+<head>
+<title>Objbrowse</title>
+<link rel="stylesheet" type="text/css" href="/objbrowse.css" />
+</head>
+<body>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script src="/objbrowse.js"></script>
+<script src="/symview.js"></script>
+<script>render(document.body, {{$}})</script>
+</body>
+</html>
 `))
 
 // AddrJS is an address for storing in JSON. It is represented in hex
@@ -150,6 +171,15 @@ func (a AddrJS) MarshalJSON() ([]byte, error) {
 	buf = append(buf, '"')
 	buf = strconv.AppendUint(buf, uint64(a), 16)
 	return append(buf, '"'), nil
+}
+
+func (a AddrJS) MarshalJSONTo(buf *bytes.Buffer) error {
+	buf.WriteByte('"')
+	ubuf := make([]byte, 0, 18)
+	ubuf = strconv.AppendUint(ubuf, uint64(a), 16)
+	buf.Write(ubuf)
+	buf.WriteByte('"')
+	return nil
 }
 
 type SymInfo struct {
@@ -269,11 +299,11 @@ var tmplSym = template.Must(template.New("").Parse(`<!DOCTYPE html>
   </defs>
 </svg>
 <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script src="/objbrowse.js"></script>
 <script src="/hexview.js"></script>
 <script src="/asmview.js"></script>
 <script src="/sourceview.js"></script>
 <script src="/liveness.js"></script>
-<script src="/objbrowse.js"></script>
 <script>render(document.body, {{$}})</script>
 </body></html>
 `))

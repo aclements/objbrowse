@@ -261,6 +261,11 @@ class LazyTable {
         // we replace blocks with individual rows.
         table.css({borderCollapse: "collapse"});
 
+        // Create a trial row to measure row height.
+        const trial = $('<tr>').append($('<td>').text('x')).appendTo(table);
+        const rowHeight = trial.height();
+        trial.remove();
+
         // Fill in blocks as they become visible.
         let iobv = new IntersectionObserver(this._fillBlocks.bind(this));
 
@@ -268,7 +273,7 @@ class LazyTable {
         this._blocks = [];
         for (let line = 0; line < lines; line += blockLines) {
             const nLines = Math.min(lines - line, blockLines);
-            const tr = $("<tr>").css("height", nLines + "em");
+            const tr = $("<tr>").css("height", rowHeight * nLines + "px");
             table.append(tr);
             iobv.observe(tr[0]);
             this._blocks.push({start: line, length: nLines, rows: null,
@@ -380,6 +385,8 @@ var baseAddr;
 
 function render(container, info) {
     const panels = new Panels(container);
+    if (info.SymView)
+        new SymView(info.SymView, panels.addCol());
     if (info.HexView)
         hexView = new HexView(info.HexView, panels.addCol());
     if (info.AsmView)
@@ -387,12 +394,14 @@ function render(container, info) {
     if (info.SourceView)
         sourceView = new SourceView(info.SourceView, panels.addCol());
 
-    baseAddr = new AddrJS(info.Base);
+    if (info.Base) {
+        baseAddr = new AddrJS(info.Base);
 
-    window.addEventListener("hashchange", onHashChange, false);
-    $.fx.off = true;  // Inhibit scrolling animations during setup.
-    onHashChange();
-    $.fx.off = false;
+        window.addEventListener("hashchange", onHashChange, false);
+        $.fx.off = true;  // Inhibit scrolling animations during setup.
+        onHashChange();
+        $.fx.off = false;
+    }
 }
 
 function onHashChange() {

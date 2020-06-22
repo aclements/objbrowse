@@ -2,6 +2,10 @@ html, body { margin: 0px; padding: 0px; height: 100%; }
 
 body { font-family: sans-serif; }
 
+input:invalid {
+    background-color: #ff8080;
+}
+
 .highlight { background: #c6eaff; }
 .pos {
   text-align: right;
@@ -13,7 +17,34 @@ body { font-family: sans-serif; }
 }
 td.pos + td:not(.pos) { border-left: #eee 1px solid; }
 
-.hv-data { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }
+.symview input {
+    margin-bottom: 0.5em;
+}
+.symview-table {
+    table-layout: fixed;
+}
+.symview-table tr {
+    cursor: pointer;
+}
+.symview-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.symview-table td:nth-child(3) {
+    text-align: right;
+}
+.symview-table tr td:nth-child(3) {
+    font-family: monospace;
+}
+tr:hover .symview-name {
+    text-decoration: underline;
+}
+.symview-name {
+    color: #0645AD;
+}
+
+.hv-data { font-family: monospace; white-space: pre; padding-left: 0.5em; }
 
 .disasm { border-spacing: 0; }
 .disasm td { padding: 0 .5em; }
