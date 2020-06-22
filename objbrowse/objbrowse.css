@@ -1,0 +1,28 @@
+html, body { margin: 0px; padding: 0px; height: 100%; }
+
+body { font-family: sans-serif; }
+
+.highlight { background: #c6eaff; }
+.pos {
+  text-align: right;
+  vertical-align: top;
+  font-family: monospace;
+  color: #888;
+  user-select: none;
+  padding-right: 0.5em;
+}
+td.pos + td:not(.pos) { border-left: #eee 1px solid; }
+
+.hv-data { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }
+
+.disasm { border-spacing: 0; }
+.disasm td { padding: 0 .5em; }
+.disasm th { padding: 0 .5em; }
+.disasm tr:hover { background: #def8ff; }
+.disasm .flag { text-align: center; }
+
+.asm-inst { white-space: nowrap; }
+
+.sv-path { text-align: left; padding-top: 1em; }
+.sv-error { color: #ff0000; }
+.sv-src { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }

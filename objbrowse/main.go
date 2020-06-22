@@ -100,11 +100,13 @@ func (s *state) serve() {
 		log.Fatalf("failed to create server socket: %v", err)
 	}
 	http.HandleFunc("/", s.httpMain)
-	http.Handle("/objbrowse.js", http.FileServer(http.Dir(*flagStatic)))
-	http.Handle("/hexview.js", http.FileServer(http.Dir(*flagStatic)))
-	http.Handle("/asmview.js", http.FileServer(http.Dir(*flagStatic)))
-	http.Handle("/sourceview.js", http.FileServer(http.Dir(*flagStatic)))
-	http.Handle("/liveness.js", http.FileServer(http.Dir(*flagStatic)))
+	fs := http.FileServer(http.Dir(*flagStatic))
+	http.Handle("/objbrowse.css", fs)
+	http.Handle("/objbrowse.js", fs)
+	http.Handle("/hexview.js", fs)
+	http.Handle("/asmview.js", fs)
+	http.Handle("/sourceview.js", fs)
+	http.Handle("/liveness.js", fs)
 	http.HandleFunc("/s/", s.httpSym)
 	addr := "http://" + ln.Addr().String()
 	fmt.Printf("Listening on %s\n", addr)
@@ -119,6 +121,7 @@ func (s *state) httpMain(w http.ResponseWriter, r *http.Request) {
 	// TODO: Make hierarchical on "."
 	// TODO: Filter by symbol type.
 	// TODO: Filter by substring.
+	// TODO: Option to demangle (do hierarchy splitting before demangling)
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
@@ -132,7 +135,7 @@ func (s *state) httpMain(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var tmplMain = template.Must(template.New("").Parse(`
+var tmplMain = template.Must(template.New("").Parse(`<!DOCTYPE html>
 <html><body>
 {{range $s := $}}<a href="/s/{{$s.Name}}">{{printf "%#x" $s.Value}} {{printf "%c" $s.Kind}} {{$s.Name}}</a><br />{{end}}
 </body></html>
@@ -244,41 +247,14 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var tmplSym = template.Must(template.New("").Parse(`
+var tmplSym = template.Must(template.New("").Parse(`<!DOCTYPE html>
 <html>
-<head><title>{{$.Title}}</title></head>
+<head>
+<title>{{$.Title}}</title>
+<link rel="stylesheet" type="text/css" href="/objbrowse.css" />
+</head>
 <body>
-<style>
-  html, body { margin: 0px; padding: 0px; }
-
-  body { font-family: sans-serif; }
-
-  .highlight { background: #c6eaff; }
-  .pos {
-    text-align: right;
-    vertical-align: top;
-    font-family: monospace;
-    color: #888;
-    user-select: none;
-    padding-right: 0.5em;
-  }
-  td.pos + td:not(.pos) { border-left: #eee 1px solid; }
-
-  .hv-data { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }
-
-  .disasm { border-spacing: 0; }
-  .disasm td { padding: 0 .5em; }
-  .disasm th { padding: 0 .5em; }
-  .disasm tr:hover { background: #def8ff; }
-  .disasm .flag { text-align: center; }
-
-  .asm-inst { white-space: nowrap; }
-
-  .sv-path { text-align: left; padding-top: 1em; }
-  .sv-error { color: #ff0000; }
-  .sv-src { font-family: monospace; white-space: pre-wrap; padding-left: 0.5em; }
-</style>
-<svg width="0" height="0" viewBox="0 0 0 0">
+<svg width="0" height="0" style="position:absolute">
   <defs>
     <marker id="tri" viewBox="0 0 10 10" refX="0" refY="5"
             markerUnits="userSpaceOnUse" markerWidth="10"
