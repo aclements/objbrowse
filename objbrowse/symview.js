@@ -53,6 +53,20 @@ class SymView {
         // the browser show the validation message.
         search.change(() => { onSearch(true); search[0].reportValidity(); });
 
+        // Keyboard shortcuts for search box.
+        //
+        // TODO: If this becomes one panel in a bigger UI, only
+        // capture this in our panel.
+        $(window).keydown(function(e){
+            const keyF = 70;
+            const keyF3 = 114;
+            const keySlash = 191;
+            if (((e.ctrlKey || e.metaKey) && e.keyCode === keyF) || e.keyCode == keyF3 || e.keyCode == keySlash) {
+                e.preventDefault();
+                search.focus();
+            }
+        });
+
         // Add table.
         const table = $('<table class="symview-table">').appendTo(container);
         this._table = table;
