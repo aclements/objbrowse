@@ -25,28 +25,14 @@ func NewTable(symbols obj.Symbols) *Table {
 	}
 
 	// Put syms in address order for fast address lookup.
-	addr := make([]obj.SymID, len(syms))
-	for i := range addr {
-		addr[i] = obj.SymID(i)
+	var addr []obj.SymID
+	for i := range syms {
+		if syms[i].HasAddr {
+			addr = append(addr, obj.SymID(i))
+		}
 	}
 	sort.Slice(addr, func(i, j int) bool {
 		si, sj := &syms[addr[i]], &syms[addr[j]]
-
-		// Put undefined symbols before defined symbols so we
-		// can trim them off.
-		//
-		// TODO: Strip using HasAddr and remove that check in
-		// Addr.
-		cati, catj := 0, 0
-		if si.Kind == obj.SymUndef {
-			cati = -1
-		}
-		if sj.Kind == obj.SymUndef {
-			catj = -1
-		}
-		if cati != catj {
-			return cati < catj
-		}
 
 		// Sort by symbol address.
 		vi, vj := si.Value, sj.Value
@@ -57,11 +43,6 @@ func NewTable(symbols obj.Symbols) *Table {
 		// Secondary sort by name.
 		return si.Name < sj.Name
 	})
-
-	// Trim undefined symbols.
-	for len(addr) > 0 && syms[addr[0]].Kind == obj.SymUndef {
-		addr = addr[1:]
-	}
 
 	// Create name map for fast name lookup.
 	name := make(map[string]obj.SymID)
@@ -102,14 +83,6 @@ func (t *Table) Addr(addr uint64) (obj.SymID, bool) {
 		sym := &t.syms[symi]
 		if sym.Value > addr {
 			break
-		}
-		if !sym.HasAddr {
-			// This symbol's value isn't an address. For
-			// example, this is an absolute symbol or a
-			// TLS symbol.
-			//
-			// TODO: Strip these in NewTable.
-			continue
 		}
 		if best == -1 && addr < sym.Value+sym.Size {
 			best = i + j
