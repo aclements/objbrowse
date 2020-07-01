@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// TODO: Implement relocs.
+
 package obj
 
 import (
@@ -17,6 +19,7 @@ import (
 type peFile struct {
 	pe        *pe.File
 	imageBase uint64
+	sizes     []uint64
 }
 
 func openPE(r io.ReaderAt) (Obj, error) {
@@ -35,7 +38,48 @@ func openPE(r io.ReaderAt) (Obj, error) {
 		return nil, fmt.Errorf("PE header has unexpected type")
 	}
 
-	return &peFile{f, imageBase}, nil
+	// Assign symbol sizes.
+	sizes := peSynthesizeSizes(f.Symbols, f.Sections)
+	return &peFile{f, imageBase, sizes}, nil
+}
+
+func peSynthesizeSizes(syms []*pe.Symbol, sects []*pe.Section) []uint64 {
+	// Sort by address (without destroying order).
+	addr := make([]int, len(syms))
+	for i := range addr {
+		addr[i] = i
+	}
+	sort.Slice(addr, func(i, j int) bool {
+		si, sj := syms[addr[i]], syms[addr[j]]
+		if si.SectionNumber != sj.SectionNumber {
+			return si.SectionNumber < sj.SectionNumber
+		}
+		return si.Value < sj.Value
+	})
+
+	// Assign addresses to symbols.
+	sizes := make([]uint64, len(syms))
+	for i, symi := range addr {
+		sym := syms[symi]
+		if sym.SectionNumber <= 0 {
+			// Not an addressable section, so no
+			// meaningful sizes.
+			continue
+		}
+		if i == len(addr) || sym.SectionNumber != syms[addr[i+1]].SectionNumber {
+			// Cap the symbol at the end of the section.
+			if int(sym.SectionNumber)-1 < len(sects) {
+				sect := sects[int(sym.SectionNumber)-1]
+				if sym.Value < sect.VirtualSize {
+					sizes[symi] = uint64(sect.VirtualSize - sym.Value)
+				}
+			}
+		} else {
+			sizes[symi] = uint64(syms[addr[i+1]].Value - sym.Value)
+		}
+	}
+
+	return sizes
 }
 
 var peToArch = map[uint16]*arch.Arch{
@@ -49,11 +93,21 @@ func (f *peFile) Info() ObjInfo {
 	}
 }
 
-func (f *peFile) Data(ptr, size uint64) ([]byte, error) {
+func (f *peFile) Data(ptr, size uint64) (Data, error) {
 	panic("not implemented")
 }
 
-func (f *peFile) Symbols() ([]Sym, error) {
+func (f *peFile) Symbols() (Symbols, error) {
+	return (*peSymbols)(f), nil
+}
+
+type peSymbols peFile
+
+func (f *peSymbols) Len() SymID {
+	return SymID(len(f.pe.Symbols))
+}
+
+func (f *peSymbols) Get(i SymID, sym *Sym) {
 	const (
 		IMAGE_SYM_UNDEFINED = 0
 		IMAGE_SYM_ABSOLUTE  = -1
@@ -67,80 +121,63 @@ func (f *peFile) Symbols() ([]Sym, error) {
 		IMAGE_SCN_MEM_WRITE              = 0x80000000
 	)
 
-	var out []Sym
-	for _, s := range f.pe.Symbols {
-		sym := Sym{s.Name, uint64(s.Value), 0, SymUnknown, false, false, int(s.SectionNumber)}
-		switch s.SectionNumber {
-		case IMAGE_SYM_UNDEFINED:
-			sym.Kind = SymUndef
-		case IMAGE_SYM_ABSOLUTE:
-			sym.Kind = SymAbsolute
-		case IMAGE_SYM_DEBUG:
+	s := f.pe.Symbols[i]
+
+	*sym = Sym{s.Name, uint64(s.Value), 0, SymUnknown, false, false}
+	switch s.SectionNumber {
+	case IMAGE_SYM_UNDEFINED:
+		sym.Kind = SymUndef
+	case IMAGE_SYM_ABSOLUTE:
+		sym.Kind = SymAbsolute
+	case IMAGE_SYM_DEBUG:
+		// Leave unknown
+	default:
+		if int(s.SectionNumber)-1 < 0 || int(s.SectionNumber)-1 >= len(f.pe.Sections) {
 			// Leave unknown
-		default:
-			if int(s.SectionNumber)-1 < 0 || int(s.SectionNumber)-1 >= len(f.pe.Sections) {
-				// Ignore symbol.
-				continue
-			}
-			sect := f.pe.Sections[int(s.SectionNumber)-1]
-			c := sect.Characteristics
-			switch {
-			case c&IMAGE_SCN_CNT_CODE != 0:
-				sym.Kind = SymText
-			case c&IMAGE_SCN_CNT_INITIALIZED_DATA != 0:
-				if c&IMAGE_SCN_MEM_WRITE != 0 {
-					sym.Kind = SymData
-				} else {
-					sym.Kind = SymROData
-				}
-			case c&IMAGE_SCN_CNT_UNINITIALIZED_DATA != 0:
-				sym.Kind = SymBSS
-			}
-			sym.Local = s.StorageClass == IMAGE_SYM_CLASS_STATIC
-			sym.Value += f.imageBase + uint64(sect.VirtualAddress)
-			sym.HasAddr = true
+			break
 		}
-
-		out = append(out, sym)
-	}
-
-	sort.Slice(out, func(i, j int) bool { return out[i].Value < out[j].Value })
-	for i := range out {
-		sym1 := &out[i]
-		if i+1 < len(out) {
-			sym2 := out[i+1]
-			if sym1.section == sym2.section {
-				sym1.Size = sym2.Value - sym1.Value
-				continue
+		sect := f.pe.Sections[int(s.SectionNumber)-1]
+		c := sect.Characteristics
+		switch {
+		case c&IMAGE_SCN_CNT_CODE != 0:
+			sym.Kind = SymText
+		case c&IMAGE_SCN_CNT_INITIALIZED_DATA != 0:
+			if c&IMAGE_SCN_MEM_WRITE != 0 {
+				sym.Kind = SymData
+			} else {
+				sym.Kind = SymROData
 			}
+		case c&IMAGE_SCN_CNT_UNINITIALIZED_DATA != 0:
+			sym.Kind = SymBSS
 		}
-		// Symbol is the last in its section.
-		sect := f.pe.Sections[sym1.section-1]
-		sym1.Size = uint64(sect.VirtualAddress) + uint64(sect.VirtualSize) - sym1.Value
+		sym.Local = s.StorageClass == IMAGE_SYM_CLASS_STATIC
+		sym.Value += f.imageBase + uint64(sect.VirtualAddress)
+		sym.HasAddr = true
 	}
-
-	return out, nil
 }
 
-func (f *peFile) SymbolData(s Sym) ([]byte, error) {
-	if s.section <= 0 || s.section-1 >= len(f.pe.Sections) {
-		return nil, nil
+func (f *peFile) SymbolData(i SymID) (Data, error) {
+	s := f.pe.Symbols[i]
+	if s.SectionNumber <= 0 || int(s.SectionNumber)-1 >= len(f.pe.Sections) {
+		return Data{R: noRelocs}, nil
 	}
-	sect := f.pe.Sections[s.section-1]
-	if s.Value < uint64(sect.VirtualAddress) {
-		return nil, fmt.Errorf("symbol %q starts before section %q", s.Name, sect.Name)
+	sect := f.pe.Sections[s.SectionNumber-1]
+	if s.Value < sect.VirtualAddress {
+		return Data{}, fmt.Errorf("symbol %q starts before section %q", s.Name, sect.Name)
 	}
-	out := make([]byte, s.Size)
-	pos := s.Value - (f.imageBase + uint64(sect.VirtualAddress))
-	if pos >= uint64(sect.Size) {
-		return out, nil
+	value := f.imageBase + uint64(s.Value) + uint64(sect.VirtualAddress)
+	out := Data{Addr: value, P: make([]byte, f.sizes[i]), R: noRelocs}
+	if s.Value < sect.Size {
+		flen := f.sizes[i]
+		if flen > uint64(sect.Size-s.Value) {
+			flen = uint64(sect.Size - s.Value)
+		}
+		_, err := sect.ReadAt(out.P[:flen], int64(s.Value))
+		if err != nil {
+			return Data{}, err
+		}
 	}
-	flen := s.Size
-	if flen > uint64(sect.Size)-pos {
-		flen = uint64(sect.Size) - pos
-	}
-	_, err := sect.ReadAt(out[:flen], int64(pos))
-	return out, err
+	return out, nil
 }
 
 func (f *peFile) DWARF() (*dwarf.Data, error) {

@@ -12,21 +12,36 @@ import (
 
 // Table facilitates fast symbol lookup.
 type Table struct {
-	addr []obj.Sym
-	name map[string]int
+	syms []obj.Sym
+	addr []obj.SymID
+	name map[string]obj.SymID
 }
 
 // NewTable creates a new table for syms.
-func NewTable(syms []obj.Sym) *Table {
+func NewTable(symbols obj.Symbols) *Table {
+	syms := make([]obj.Sym, symbols.Len())
+	for i := range syms {
+		symbols.Get(obj.SymID(i), &syms[i])
+	}
+
 	// Put syms in address order for fast address lookup.
-	sort.Slice(syms, func(i, j int) bool {
+	addr := make([]obj.SymID, len(syms))
+	for i := range addr {
+		addr[i] = obj.SymID(i)
+	}
+	sort.Slice(addr, func(i, j int) bool {
+		si, sj := &syms[addr[i]], &syms[addr[j]]
+
 		// Put undefined symbols before defined symbols so we
 		// can trim them off.
+		//
+		// TODO: Strip using HasAddr and remove that check in
+		// Addr.
 		cati, catj := 0, 0
-		if syms[i].Kind == obj.SymUndef {
+		if si.Kind == obj.SymUndef {
 			cati = -1
 		}
-		if syms[j].Kind == obj.SymUndef {
+		if sj.Kind == obj.SymUndef {
 			catj = -1
 		}
 		if cati != catj {
@@ -34,55 +49,57 @@ func NewTable(syms []obj.Sym) *Table {
 		}
 
 		// Sort by symbol address.
-		vi, vj := syms[i].Value, syms[j].Value
+		vi, vj := si.Value, sj.Value
 		if vi != vj {
 			return vi < vj
 		}
 
 		// Secondary sort by name.
-		return syms[i].Name < syms[j].Name
+		return si.Name < sj.Name
 	})
 
 	// Trim undefined symbols.
-	for len(syms) > 0 && syms[0].Kind == obj.SymUndef {
-		syms = syms[1:]
+	for len(addr) > 0 && syms[addr[0]].Kind == obj.SymUndef {
+		addr = addr[1:]
 	}
 
 	// Create name map for fast name lookup.
-	name := make(map[string]int)
+	name := make(map[string]obj.SymID)
 	for i, s := range syms {
-		name[s.Name] = i
+		name[s.Name] = obj.SymID(i)
 	}
 
-	return &Table{syms, name}
+	return &Table{syms, addr, name}
 }
 
-// Syms returns all symbols in Table in address order. The caller must
-// not modify the returned slice.
+// Syms returns all symbols in Table. The returned slice can be
+// indexed by SymID. The caller must not modify the returned slice.
 func (t *Table) Syms() []obj.Sym {
-	return t.addr
+	return t.syms
 }
 
 // Name returns the symbol with the given name.
-func (t *Table) Name(name string) (obj.Sym, bool) {
-	if i, ok := t.name[name]; ok {
-		return t.addr[i], true
+func (t *Table) Name(name string) (obj.SymID, bool) {
+	i, ok := t.name[name]
+	if !ok {
+		i = -1
 	}
-	return obj.Sym{}, false
+	return i, ok
 }
 
 // Addr returns the symbol containing addr.
-func (t *Table) Addr(addr uint64) (obj.Sym, bool) {
+func (t *Table) Addr(addr uint64) (obj.SymID, bool) {
 	i := sort.Search(len(t.addr), func(i int) bool {
-		return addr < t.addr[i].Value
+		return addr < t.syms[t.addr[i]].Value
 	}) - 1
 	if i < 0 {
-		return obj.Sym{}, false
+		return -1, false
 	}
 	// There may be multiple symbols at this address. Pick the
 	// "best" based on some heuristics.
 	best, bestZeroSize := -1, -1
-	for j, sym := range t.addr[i:] {
+	for j, symi := range t.addr[i:] {
+		sym := &t.syms[symi]
 		if sym.Value > addr {
 			break
 		}
@@ -90,6 +107,8 @@ func (t *Table) Addr(addr uint64) (obj.Sym, bool) {
 			// This symbol's value isn't an address. For
 			// example, this is an absolute symbol or a
 			// TLS symbol.
+			//
+			// TODO: Strip these in NewTable.
 			continue
 		}
 		if best == -1 && addr < sym.Value+sym.Size {
@@ -107,7 +126,7 @@ func (t *Table) Addr(addr uint64) (obj.Sym, bool) {
 	case bestZeroSize != -1 && bestZeroSize != len(t.addr)-1:
 		return t.addr[bestZeroSize], true
 	}
-	return obj.Sym{}, false
+	return -1, false
 }
 
 // SymName returns the name and base of the symbol containing addr. It
@@ -118,8 +137,13 @@ func (t *Table) Addr(addr uint64) (obj.Sym, bool) {
 //
 // This is useful for x/arch disassembly functions.
 func (t *Table) SymName(addr uint64) (name string, base uint64) {
-	if sym, ok := t.Addr(addr); ok && sym.Value != 0 {
-		return sym.Name, sym.Value
+	symID, ok := t.Addr(addr)
+	if !ok {
+		return "", 0
 	}
-	return "", 0
+	sym := &t.syms[symID]
+	if sym.Value == 0 {
+		return "", 0
+	}
+	return sym.Name, sym.Value
 }

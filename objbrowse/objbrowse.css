@@ -45,6 +45,8 @@ tr:hover .symview-name {
 }
 
 .hv-data { font-family: monospace; white-space: pre; padding-left: 0.5em; }
+.hv-reloc-indent { font-family: monospace; white-space: pre; padding-left: 0.5em; }
+.hv-reloc { white-space: pre; }
 
 .disasm { border-spacing: 0; }
 .disasm td { padding: 0 .5em; }

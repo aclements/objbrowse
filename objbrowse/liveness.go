@@ -27,7 +27,8 @@ func NewLivenessOverlay(fi *FileInfo, symTab *symtab.Table) *LivenessOverlay {
 		if err != nil {
 			log.Fatal(err)
 		}
-		funcTab, err := functab.NewFuncTab(data, fi.Obj)
+		// TODO: What if data has relocations (e.g., in a .so)?
+		funcTab, err := functab.NewFuncTab(data.P, fi.Obj)
 		if err != nil {
 			log.Fatal(err)
 		}

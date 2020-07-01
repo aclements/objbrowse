@@ -91,7 +91,7 @@ func open() *state {
 	// TODO: Do something with the error.
 	fi := &FileInfo{bin}
 	symView := NewSymView(fi, symTab)
-	hexView := NewHexView(fi)
+	hexView := NewHexView(fi, symTab)
 	asmView, _ := NewAsmView(fi, symTab)
 	sourceView, _ := NewSourceView(fi)
 
@@ -231,21 +231,28 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 	symName := r.URL.Path[3:]
 	info.Title = symName
 
-	sym, ok := s.symTab.Name(symName)
+	// TODO: Name isn't unique for local symbols, though it's
+	// *usually* unique and this makes for useful URLs. The
+	// address isn't necessarily unique either for symbols in
+	// different sections. Maybe we want something like
+	// /s/<name>[/num] to distinguish when necessary? This is also
+	// a problem for links created from symbolized assembly.
+	symID, ok := s.symTab.Name(symName)
 	if !ok {
 		fmt.Fprintln(w, "unknown symbol")
 		return
 	}
+	sym := s.symTab.Syms()[symID]
 	info.Base = AddrJS(sym.Value)
 
-	data, err := s.bin.SymbolData(sym)
+	data, err := s.bin.SymbolData(symID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Process HexView.
-	hv, err := s.hexView.DecodeSym(sym, data)
+	hv, err := s.hexView.DecodeSym(data)
 	if err != nil {
 		// TODO: Display this to the user.
 		log.Print(err)
@@ -254,7 +261,7 @@ func (s *state) httpSym(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process AsmView.
-	av, err := s.asmView.DecodeSym(sym, data)
+	av, err := s.asmView.DecodeSym(sym, data.P)
 	if err != nil {
 		// TODO: Display this to the user.
 		log.Print(err)

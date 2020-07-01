@@ -5,6 +5,7 @@
 package functab
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -14,7 +15,14 @@ type FuncData struct {
 }
 
 func (f FuncData) Read(size uint64) ([]byte, error) {
-	return f.fi.mmap.Data(f.ptr, size)
+	data, err := f.fi.mmap.Data(f.ptr, size)
+	if err != nil {
+		return nil, err
+	}
+	if data.R.Len() != 0 {
+		return nil, fmt.Errorf("funcdata contains relocations")
+	}
+	return data.P, nil
 }
 
 func (f FuncData) StackMap() ([]Bitmap, error) {
