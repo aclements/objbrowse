@@ -1,0 +1,70 @@
+::-webkit-scrollbar {
+    width: .5rem;
+    height: .5rem;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgba(127,127,127,0.5);
+    border-radius: .25rem;
+}
+
+::-webkit-scrollbar-thumb:vertical {
+    min-height: 30px;
+}
+
+::-webkit-scrollbar-thumb:horizontal {
+    min-width: 30px;
+}
+
+.ob-root {
+    display: flex;
+    flex-wrap: nowrap;
+    height: 100vh;
+    height: -webkit-fill-available;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.ob-sympanel {
+    position: sticky; /* TODO: Necessary? */
+    overflow: scroll;  /* Show scrollbars */
+    overflow: overlay; /* Webkit: show content under scrollbars */
+    height: 100vh;
+    border-right: 1px solid #ccc;
+}
+
+.ob-sympanel input {
+    width: 100%;
+}
+
+.ob-symlist-outer {
+    /* Add a left margin before the inner element fills the full remaining width. */
+    margin-left: 0.75rem;
+}
+
+.ob-symlist {
+    /* Expand to the width of the widest element (some symbols are very long). */
+    display: inline-block;
+    /* But for the click zone and highlighting, make sure it's at least the full width. */
+    min-width: 100%;
+}
+
+.ob-symlist > li {
+    cursor: pointer;
+    
+    border-left: 0.5rem solid transparent;
+    border-radius: 1rem 0 0 1rem;
+}
+
+.ob-symlist > li:hover {
+    background-color: rgba(127,127,127,0.5);
+}
+
+.ob-symlist-selected {
+    background-color: var(--bs-primary) !important; /* Override :hover */
+    color: white;
+}
