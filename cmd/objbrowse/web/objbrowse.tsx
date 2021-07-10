@@ -14,7 +14,11 @@ type Entity = { type: "sym", id: number }
 type MaybeEntity = null | Entity
 
 export interface ViewProps { entity: Entity }
-export interface View { element: (props: ViewProps) => JSX.Element, name: string }
+export interface View {
+    element: (props: ViewProps) => JSX.Element;
+    id: string;
+    label: string;
+}
 
 export interface AppProps { views: View[] }
 
@@ -22,22 +26,29 @@ export function App(props: AppProps) {
     // TODO: Sync current entity (and selected range in that entity) to the URL
     // history.
     const [selected, setSelected] = useState<MaybeEntity>(null);
+    const [view, setView] = useState("");
 
-    // TODO: This just loops over all the views, but I need to present
-    // just the views that support the current entity and panel them in
-    // some way (which will clean up the styling on the second column).
+    const resetSelected = (entity: MaybeEntity) => {
+        setSelected(entity);
+        if (entity === null) {
+            setView("");
+        } else {
+            setView(props.views[0].id);
+        }
+    }
+
     return (
         <div className="ob-root">
             <div className="container-fluid">
                 <div className="row flex-xl-nowrap">
                     <div className="col-2 p-0">
-                        <SymPanel value={selected} onSelect={setSelected} />
+                        <SymPanel value={selected} onSelect={resetSelected} />
                     </div>
-                    <div className="col-10" style={{ height: "100vh", overflow: "scroll" }}>
-                        {selected !== null && props.views.map((View) =>
-                            <View.element key={View.name} entity={selected}></View.element>)
-                        }
-                    </div>
+                    {selected !== null &&
+                        <div className="col-10 p-0">
+                            <EntityPanel views={props.views} view={view} entity={selected} onSelect={setView} />
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -106,6 +117,33 @@ function SymList(props: SymListProps) {
                     }
                 })}
             </ul >
+        </div>
+    );
+}
+
+interface EntityPanelProps { views: View[], view: string, entity: Entity, onSelect: (view: string) => void }
+
+function EntityPanel(props: EntityPanelProps) {
+    // TODO: This just loops over all the views, but I need to present
+    // just the views that support the current entity.
+    return (
+        <div className="ob-view-container">
+            {/* padding-left extends the bottom border to the left */}
+            {/* padding-top keeps it in place when scrolling */}
+            <nav className="nav nav-tabs ps-3 pt-3">
+                {props.views.map((View) =>
+                    View.id == props.view ?
+                        <span className="nav-link active" aria-current="page">{View.label}</span> :
+                        <span className="nav-link" onClick={() => props.onSelect(View.id)}>{View.label}</span>
+                )}
+            </nav>
+            <div>
+                {props.views.map((View) =>
+                    <div className="p-3" style={{ display: View.id == props.view ? "block" : "none" }}>
+                        <View.element key={View.id} entity={props.entity}></View.element>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

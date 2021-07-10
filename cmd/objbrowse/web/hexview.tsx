@@ -114,4 +114,4 @@ function formatLine(data: string, start: number) {
     return [line, ascii];
 }
 
-export const HexView = { element: HexViewer, name: "hex" };
+export const HexView = { element: HexViewer, id: "hex", label: "Hex" };

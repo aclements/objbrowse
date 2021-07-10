@@ -68,3 +68,20 @@
     background-color: var(--bs-primary) !important; /* Override :hover */
     color: white;
 }
+
+.ob-view-container {
+    height: 100vh;
+    display: flex;
+    flex-flow: column;
+}
+
+.ob-view-container > nav {
+    flex: 0 1 auto;
+    cursor: pointer;
+}
+
+.ob-view-container > div {
+    /* Expand to the rest of the height */
+    flex: 1 1 auto;
+    overflow: scroll;
+}
