@@ -5,11 +5,17 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import "bootstrap/dist/css/bootstrap.min.css"; // For loading spinner and errors.
 
 export type UseFetchJSONResult = { pending: React.ReactElement, error?: string } | { pending: false, value: any }
 
 const useFetchJSONPending: UseFetchJSONResult = {
-    pending: <div>Loading...</div>,
+    pending: (
+        <div className="d-flex align-items-center">
+            <strong>Loading...</strong>
+            <div className="spinner-border ms-auto" role="status" aria-hidden="true"></div>
+        </div>
+    ),
 };
 
 /**
@@ -23,8 +29,6 @@ const useFetchJSONPending: UseFetchJSONResult = {
 export function useFetchJSON(url: string): UseFetchJSONResult {
     const [res, setRes] = useState(useFetchJSONPending);
 
-    // TODO: Make the loading and error displays look nicer.
-
     useEffect(() => {
         const controller = new AbortController();
         const signal = controller.signal;
@@ -36,8 +40,7 @@ export function useFetchJSON(url: string): UseFetchJSONResult {
             try {
                 const res = await fetch(url, { signal });
                 if (!res.ok) {
-                    console.log(`fetching ${url}: ${res.status} ${res.statusText}`);
-                    setRes({ error: res.statusText, pending: <div>Error: {res.statusText}</div> });
+                    throw `${res.status} ${res.statusText}`
                 } else {
                     const val = await res.json();
                     setRes({ pending: false, value: val });
@@ -49,7 +52,7 @@ export function useFetchJSON(url: string): UseFetchJSONResult {
                     setRes(useFetchJSONPending);
                 } else {
                     console.log(`fetching ${url}: ${e}`);
-                    setRes({ error: String(e), pending: <div>Error: {String(e)}</div> });
+                    setRes({ error: String(e), pending: <div className="alert alert-danger" role="alert">Error: {String(e)}</div> });
                 }
             }
         }
