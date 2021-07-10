@@ -60,6 +60,7 @@ func main() {
 		log.Fatalf("failed to start server: %s", err)
 	}
 	server.addView(NewHexView(server))
+	server.addView(NewAsmView(server))
 
 	addr := "http://" + server.listener.Addr().String()
 	fmt.Printf("Listening on %s\n", addr)

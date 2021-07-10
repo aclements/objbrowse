@@ -9,10 +9,11 @@ import ReactDOM from "react-dom";
 
 import { App } from "./objbrowse";
 import { HexView } from "./hexview";
+import { AsmView } from "./asmview";
 
 function main() {
     ReactDOM.render(
-        <App views={[HexView]} />,
+        <App views={[AsmView, HexView]} />,
         document.getElementById('root')
     );
 }

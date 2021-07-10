@@ -27,6 +27,8 @@
     height: -webkit-fill-available;
     overflow-x: auto;
     overflow-y: hidden;
+
+    --ob-addr-color: #6c757d; /* .text-muted */
 }
 
 .ob-sympanel {

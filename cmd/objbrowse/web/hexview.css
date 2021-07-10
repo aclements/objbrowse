@@ -12,7 +12,7 @@
 }
 
 .hv-table th {
-    color: #6c757d; /* .text-muted */
+    color: var(--ob-addr-color);
     font-weight: inherit;
     position: sticky;
     top: 0;
@@ -20,7 +20,7 @@
 }
 
 .hv-table td:first-child {
-    color: #6c757d; /* .text-muted */
+    color: var(--ob-addr-color);
     user-select: none;
     text-align: right;
 }
