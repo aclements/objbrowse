@@ -24,27 +24,26 @@ function HexViewer(props: ViewProps) {
     }
     const v: json = fetch.value;
 
-    const start = BigInt("0x" + v.Addr);
-    const len = v.Data.length / 2;
-
-    // Format column header.
+    // Format column headers.
     let hexHead = "", asciiHead = "";
-    let headStart = Number(start % BigInt(16));
     for (let i = 0; i < 16; i++) {
         if (i == 8) {
             hexHead += "  ";
         } else if (i > 0) {
             hexHead += " ";
         }
-        const digit = ((headStart + i) % 16).toString(16)
+        const digit = i.toString(16)
         hexHead += " " + digit;
         asciiHead += digit;
     }
 
-    // TODO: Maybe a line should always start at a 0 offset and just
-    // insert spaces to get to the first byte. The rendering of things
-    // that don't start 16-byte aligned is really kind of weird. (Look
-    // at, e.g., runtime.call*.args_stackmap.)
+    // We always start the first row 16-byte aligned so it's easy to
+    // visually combine the address with the header row. startOffset is
+    // the offset of the top-left byte from v.Addr (it will be between
+    // -15 and 0).
+    const dataStart = BigInt("0x" + v.Addr);
+    const startOffset = -Number(dataStart % BigInt(16));
+    const len = v.Data.length / 2;
 
     // TODO: Support for selecting ranges, both in the hex or the ASCII.
     // Measure text dimensions by creating a hidden div with a
@@ -68,21 +67,21 @@ function HexViewer(props: ViewProps) {
     // layout each column in its own inline-block, selection would also be more
     // natural (though maybe I have to totally override that anyway). OTOH, if
     // I'm going to the trouble of making this lazy, a table may just be easier
-    // and the cost irrelevant.
+    // and the cost irrelevant. CSS grid would work well for this.
 
     const rows: React.ReactElement[] = [];
-    for (let off = 0; off < len; off += 16) {
+    for (let off = startOffset; off < len; off += 16) {
         const [hex, ascii] = formatLine(v.Data, off);
         rows.push(
             <tr key={off}>
-                <td>0x{(start + BigInt(off)).toString(16)}</td>
+                <td>0x{(dataStart + BigInt(off)).toString(16)}</td>
                 <td>{hex}</td>
                 <td>{ascii}</td>
             </tr>
         )
     }
 
-    const addrWidth = 2 + (start + BigInt(len)).toString(16).length;
+    const addrWidth = 2 + (dataStart + BigInt(len)).toString(16).length;
     return (<table className="hv-table" >
         <colgroup>
             <col style={{ width: addrWidth + "ch" }}></col>
@@ -99,10 +98,18 @@ function formatLine(data: string, start: number) {
     let line = "";
     let ascii = "";
     for (let i = 0; i < 16 && start + i < dataLen; i++) {
-        if (i == 8)
+        if (i == 8) {
             line += "  ";
-        else if (i > 0)
+        } else if (i > 0) {
             line += " ";
+        }
+        if (start + i < 0) {
+            // Before the beginning of the data.
+            line += "  ";
+            ascii += " ";
+            continue;
+        }
+
         const hex = data.substr((start + i) * 2, 2);
         line += hex;
         const val = parseInt(hex, 16);

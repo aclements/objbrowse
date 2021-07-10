@@ -22,6 +22,7 @@
 .hv-table td:first-child {
     color: #6c757d; /* .text-muted */
     user-select: none;
+    text-align: right;
 }
 
 .hv-table td, .hv-table th {
