@@ -6,18 +6,21 @@
 
 import React from "react";
 
-import { ViewProps, Entity } from "./objbrowse";
+import { ViewProps, Entity, Selection } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
 
 import "./asmview.css";
+import { Ranges } from "./ranges";
 
 type json = { Insts: inst[], Refs: symRef[], LastPC: string }
 type inst = { PC: string, Op: string, Args: string, Control?: control }
 type symRef = { ID: number, Name: string }
 type control = { Type: number, Conditional: boolean, TargetPC: string }
 
+// TODO: Jump to/highlight selected range.
+
 function AsmViewer(props: ViewProps) {
-    const fetch = useFetchJSON(`/sym/${props.entity.id}/asm`)
+    const fetch = useFetchJSON(`/sym/${props.value.entity.id}/asm`)
     if (fetch.pending) {
         return fetch.pending;
     }
@@ -43,7 +46,7 @@ function AsmViewer(props: ViewProps) {
     return <table className="av-table"><tbody>{rows}</tbody></table>;
 }
 
-function formatArgs(args: string, symRefs: symRef[], onSelect: (ent: Entity) => void): React.ReactElement {
+function formatArgs(args: string, symRefs: symRef[], onSelect: (sel: Selection) => void): React.ReactElement {
     if (!args.includes("\u00ab")) {
         return <>{args}</>;
     }
@@ -62,8 +65,12 @@ function formatArgs(args: string, symRefs: symRef[], onSelect: (ent: Entity) => 
         if (offset != 0) {
             text += `+0x${offset.toString(16)}`;
         }
-        // TODO: Link to offset. I might need to replace Entity for this.
-        parts.push(<a href="#" onClick={(ev) => { onSelect({ type: "sym", id: sym.ID }); ev.preventDefault(); }}>{text}</a>);
+        parts.push(<a href="#" onClick={(ev) => {
+            const entity: Entity = { type: "sym", id: sym.ID };
+            const ranges = new Ranges([{ start: offset, end: offset + 1 }]);
+            onSelect({ entity, ranges });
+            ev.preventDefault();
+        }}>{text}</a>);
         start = re.lastIndex;
     }
     // Remainder of argument.

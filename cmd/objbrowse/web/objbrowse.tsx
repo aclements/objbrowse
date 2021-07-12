@@ -9,13 +9,14 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./objbrowse.css";
 
 import { useFetchJSON } from "./hooks";
+import { Ranges } from "./ranges";
 
 export type Entity = { type: "sym", id: number }
-type MaybeEntity = null | Entity
+export type Selection = { entity: Entity, ranges: Ranges }
 
 export interface ViewProps {
-    entity: Entity;
-    onSelect: (ent: Entity) => void;
+    value: Selection;
+    onSelect: (ent: Selection) => void;
 }
 export interface View {
     element: (props: ViewProps) => JSX.Element;
@@ -28,14 +29,16 @@ export interface AppProps { views: View[] }
 export function App(props: AppProps) {
     // TODO: Sync current entity (and selected range in that entity) to the URL
     // history.
-    const [selected, setSelected] = useState<MaybeEntity>(null);
+    const [selected, setSelected] = useState<Selection | undefined>(undefined);
     const [view, setView] = useState("");
 
-    const resetSelected = (entity: MaybeEntity) => {
-        setSelected(entity);
-        if (entity === null) {
+    const setEntity = (entity?: Entity) => {
+        if (entity === undefined) {
+            setSelected(undefined);
             setView("");
         } else {
+            setSelected({ entity, ranges: new Ranges() });
+            // TODO: Not all views are valid. Select the first valid one for this entity.
             setView(props.views[0].id);
         }
     }
@@ -45,11 +48,11 @@ export function App(props: AppProps) {
             <div className="container-fluid">
                 <div className="row flex-xl-nowrap">
                     <div className="col-2 p-0">
-                        <SymPanel value={selected} onSelect={resetSelected} />
+                        <SymPanel entity={selected?.entity} onSelect={setEntity} />
                     </div>
-                    {selected !== null &&
+                    {selected !== undefined &&
                         <div className="col-10 p-0">
-                            <EntityPanel views={props.views} view={view} onSelectView={setView} entity={selected} onSelectEntity={resetSelected} />
+                            <EntityPanel views={props.views} view={view} onSelectView={setView} value={selected} onSelect={setSelected} />
                         </div>
                     }
                 </div>
@@ -58,7 +61,7 @@ export function App(props: AppProps) {
     );
 }
 
-interface SymPanelProps { value: MaybeEntity, onSelect: (ent: MaybeEntity) => void }
+interface SymPanelProps { entity?: Entity, onSelect: (ent?: Entity) => void }
 
 function SymPanel(props: SymPanelProps) {
     const [filterStr, setFilterStr] = useState("");
@@ -90,12 +93,12 @@ function SymPanel(props: SymPanelProps) {
             // Don't add left or right margin. The SymList rows add their own.
         }
         <div className="my-3">
-            <SymList filter={filter} value={props.value} onSelect={props.onSelect} />
+            <SymList filter={filter} entity={props.entity} onSelect={props.onSelect} />
         </div>
     </div >);
 }
 
-interface SymListProps { filter: RegExp, value: MaybeEntity, onSelect: (ent: MaybeEntity) => void }
+interface SymListProps { filter: RegExp, entity?: Entity, onSelect: (ent?: Entity) => void }
 
 function SymList(props: SymListProps) {
     // Scroll when the selected entity changes.
@@ -104,7 +107,7 @@ function SymList(props: SymListProps) {
         if (selectedElt.current !== null) {
             selectedElt.current.scrollIntoView({ block: "nearest" });
         }
-    }, [props.value]);
+    }, [props.entity]);
 
     // Fetch symbol list.
     const symsJSON = useFetchJSON("/syms");
@@ -122,7 +125,7 @@ function SymList(props: SymListProps) {
             {syms.map((name, id) => {
                 if (props.filter.test(name)) {
                     let extra = null;
-                    if (props.value !== null && props.value.type == "sym" && props.value.id == id) {
+                    if (props.entity?.type == "sym" && props.entity.id == id) {
                         extra = { className: "ob-symlist-selected", ref: selectedElt };
                     }
                     return <li key={id} onClick={() => props.onSelect({ type: "sym", id: id })} {...extra}><div>{name}</div></li>;
@@ -136,8 +139,8 @@ interface EntityPanelProps {
     views: View[];
     view: string;
     onSelectView: (view: string) => void;
-    entity: Entity;
-    onSelectEntity: (entity: Entity) => void;
+    value: Selection;
+    onSelect: (sel: Selection) => void;
 }
 
 function EntityPanel(props: EntityPanelProps) {
@@ -157,7 +160,7 @@ function EntityPanel(props: EntityPanelProps) {
             <div>
                 {props.views.map((View) =>
                     <div className="p-3" style={{ display: View.id == props.view ? "block" : "none" }}>
-                        <View.element key={View.id} entity={props.entity} onSelect={props.onSelectEntity}></View.element>
+                        <View.element key={View.id} value={props.value} onSelect={props.onSelect}></View.element>
                     </div>
                 )}
             </div>

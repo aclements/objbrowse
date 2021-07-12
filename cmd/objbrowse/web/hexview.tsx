@@ -13,8 +13,10 @@ import "./hexview.css";
 
 type json = { Addr: string, Data: string }
 
+// TODO: Jump to/highlight selected range.
+
 function HexViewer(props: ViewProps) {
-    const fetch = useFetchJSON(`/sym/${props.entity.id}/hex`)
+    const fetch = useFetchJSON(`/sym/${props.value.entity.id}/hex`)
     if (fetch.pending) {
         return fetch.pending;
     }
