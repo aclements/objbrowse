@@ -12,6 +12,11 @@ import { useFetchJSON } from "./hooks";
 import { Ranges } from "./ranges";
 
 export type Entity = { type: "sym", id: number }
+
+function entityKey(ent: Entity): string {
+    return `${ent.type}/${ent.id}`;
+}
+
 export type Selection = { entity: Entity, ranges: Ranges }
 
 export interface ViewProps {
@@ -157,13 +162,14 @@ function EntityPanel(props: EntityPanelProps) {
                         <span className="nav-link" onClick={() => props.onSelectView(View.id)}>{View.label}</span>
                 )}
             </nav>
-            <div>
-                {props.views.map((View) =>
-                    <div className="p-3" style={{ display: View.id == props.view ? "block" : "none" }}>
-                        <View.element key={View.id} value={props.value} onSelect={props.onSelect}></View.element>
-                    </div>
-                )}
-            </div>
+            {props.views.map((View) =>
+                // We make the entity key part of the view key so
+                // the element gets completely reset when the entity
+                // changes.
+                <div key={`${View.id} ${entityKey(props.value.entity)}`} className="p-3" style={{ display: View.id == props.view ? "block" : "none" }}>
+                    <View.element value={props.value} onSelect={props.onSelect}></View.element>
+                </div>
+            )}
         </div>
     );
 }
