@@ -6,13 +6,14 @@
 
 import React from "react";
 
-import { ViewProps } from "./objbrowse";
+import { ViewProps, Entity } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
 
 import "./asmview.css";
 
-type json = { Insts: inst[], LastPC: string }
-type inst = { PC: string, Op: string, Args: string[], Control?: control }
+type json = { Insts: inst[], Refs: symRef[], LastPC: string }
+type inst = { PC: string, Op: string, Args: string, Control?: control }
+type symRef = { ID: number, Name: string }
 type control = { Type: number, Conditional: boolean, TargetPC: string }
 
 function AsmViewer(props: ViewProps) {
@@ -34,18 +35,40 @@ function AsmViewer(props: ViewProps) {
                 <td className="av-addr">0x{inst.PC}</td>
                 <td className="av-addr">+0x{pcDelta.toString(16)}</td>
                 <td className="av-inst">{inst.Op}</td>
-                <td className="av-inst">{formatArgs(inst.Args)}</td>
+                <td className="av-inst">{formatArgs(inst.Args, v.Refs, props.onSelect)}</td>
             </tr>
         );
     }
 
-    return <table className="av-table">{rows}</table>;
+    return <table className="av-table"><tbody>{rows}</tbody></table>;
 }
 
-function formatArgs(args: string[]): React.ReactElement[] {
-    // TODO: Link symbols. I probably need exact SymIDs to do this
-    // reliably, rather than depending on the name in the text.
-    return [<>{args.join(", ")}</>];
+function formatArgs(args: string, symRefs: symRef[], onSelect: (ent: Entity) => void): React.ReactElement {
+    if (!args.includes("\u00ab")) {
+        return <>{args}</>;
+    }
+
+    let parts: React.ReactElement[] = [];
+    let re = /\u00ab(\d+)\+([0-9a-fA-F]+)\u00bb/g;
+    let start = 0;
+    let m;
+    while ((m = re.exec(args)) !== null) {
+        if (m.index > 0) {
+            parts.push(<>{args.substring(start, m.index)}</>);
+        }
+        const sym = symRefs[parseInt(m[1], 10)];
+        const offset = parseInt(m[2], 16);
+        let text = sym.Name;
+        if (offset != 0) {
+            text += `+0x${offset.toString(16)}`;
+        }
+        // TODO: Link to offset. I might need to replace Entity for this.
+        parts.push(<a href="#" onClick={(ev) => { onSelect({ type: "sym", id: sym.ID }); ev.preventDefault(); }}>{text}</a>);
+        start = re.lastIndex;
+    }
+    // Remainder of argument.
+    parts.push(<>{args.substring(start)}</>);
+    return <>{parts}</>;
 }
 
 export const AsmView = { element: AsmViewer, id: "asm", label: "Assembly" };

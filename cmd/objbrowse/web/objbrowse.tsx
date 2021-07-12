@@ -10,10 +10,13 @@ import "./objbrowse.css";
 
 import { useFetchJSON } from "./hooks";
 
-type Entity = { type: "sym", id: number }
+export type Entity = { type: "sym", id: number }
 type MaybeEntity = null | Entity
 
-export interface ViewProps { entity: Entity }
+export interface ViewProps {
+    entity: Entity;
+    onSelect: (ent: Entity) => void;
+}
 export interface View {
     element: (props: ViewProps) => JSX.Element;
     id: string;
@@ -46,7 +49,7 @@ export function App(props: AppProps) {
                     </div>
                     {selected !== null &&
                         <div className="col-10 p-0">
-                            <EntityPanel views={props.views} view={view} entity={selected} onSelect={setView} />
+                            <EntityPanel views={props.views} view={view} onSelectView={setView} entity={selected} onSelectEntity={resetSelected} />
                         </div>
                     }
                 </div>
@@ -129,7 +132,13 @@ function SymList(props: SymListProps) {
     );
 }
 
-interface EntityPanelProps { views: View[], view: string, entity: Entity, onSelect: (view: string) => void }
+interface EntityPanelProps {
+    views: View[];
+    view: string;
+    onSelectView: (view: string) => void;
+    entity: Entity;
+    onSelectEntity: (entity: Entity) => void;
+}
 
 function EntityPanel(props: EntityPanelProps) {
     // TODO: This just loops over all the views, but I need to present
@@ -142,13 +151,13 @@ function EntityPanel(props: EntityPanelProps) {
                 {props.views.map((View) =>
                     View.id == props.view ?
                         <span className="nav-link active" aria-current="page">{View.label}</span> :
-                        <span className="nav-link" onClick={() => props.onSelect(View.id)}>{View.label}</span>
+                        <span className="nav-link" onClick={() => props.onSelectView(View.id)}>{View.label}</span>
                 )}
             </nav>
             <div>
                 {props.views.map((View) =>
                     <div className="p-3" style={{ display: View.id == props.view ? "block" : "none" }}>
-                        <View.element key={View.id} entity={props.entity}></View.element>
+                        <View.element key={View.id} entity={props.entity} onSelect={props.onSelectEntity}></View.element>
                     </div>
                 )}
             </div>

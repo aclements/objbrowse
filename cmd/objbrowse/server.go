@@ -15,6 +15,7 @@ import (
 	"strconv"
 
 	"github.com/aclements/go-obj/obj"
+	"github.com/aclements/go-obj/symtab"
 )
 
 type View interface {
@@ -23,7 +24,8 @@ type View interface {
 }
 
 type server struct {
-	Obj obj.File
+	Obj    obj.File
+	SymTab *symtab.Table
 
 	listener net.Listener
 	mux      http.Handler
@@ -39,10 +41,20 @@ func newServer(f obj.File, host string, static fs.FS) (*server, error) {
 	}
 	s := &server{Obj: f, listener: ln, viewMap: make(map[string]View)}
 
+	// Get all symbols, synthesize missing sizes, and create a symbol table.
+	syms := make([]obj.Sym, f.NumSyms())
+	for i := range syms {
+		syms[i] = f.Sym(obj.SymID(i))
+	}
+	obj.SynthesizeSizes(syms)
+	s.SymTab = symtab.NewTable(syms)
+
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(static)))
 	mux.Handle("/syms", http.HandlerFunc(s.serveSyms))
 	mux.Handle("/sym/", http.HandlerFunc(s.serveSym))
+	// TODO: Also provide an index over sections and maybe even a view
+	// over the whole object.
 	s.mux = mux
 
 	return s, nil
@@ -96,7 +108,8 @@ func (s *server) serveSym(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	sym := s.Obj.Sym(obj.SymID(id))
+	// Get the symbol from the symbol table so we get any synthesized sizes.
+	sym := s.SymTab.Syms()[id]
 	viewer := view.View(&sym)
 	if viewer == nil {
 		http.Error(w, "view does not support this entity", http.StatusNotFound)
