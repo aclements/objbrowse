@@ -50,6 +50,6 @@ func (v *HexView) View(entity interface{}) http.HandlerFunc {
 			}
 			return
 		}
-		serveJSON(w, hexViewJSON{AddrJS(data.Addr), fmt.Sprintf("%x", data.P)})
+		serveJSON(w, hexViewJSON{AddrJS(data.Addr), fmt.Sprintf("%x", data.B)})
 	}
 }

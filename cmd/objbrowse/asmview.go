@@ -71,7 +71,7 @@ func (v *AsmView) View(entity interface{}) http.HandlerFunc {
 			return
 		}
 
-		insts, err := asm.Disasm(v.f.Info().Arch, data.P, sym.Value)
+		insts, err := asm.Disasm(v.f.Info().Arch, data.B, sym.Value)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
