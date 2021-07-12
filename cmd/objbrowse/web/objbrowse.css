@@ -43,11 +43,6 @@
     width: 100%;
 }
 
-.ob-symlist-outer {
-    /* Add a left margin before the inner element fills the full remaining width. */
-    margin-left: 0.75rem;
-}
-
 .ob-symlist {
     /* Expand to the width of the widest element (some symbols are very long). */
     display: inline-block;
@@ -57,16 +52,22 @@
 
 .ob-symlist > li {
     cursor: pointer;
-    
+    /* We add the padding at the li level so we can use scrollIntoView
+     * without triggering horizontal scrolling. */
+    padding-left: 0.75rem;
+}
+
+/* Apply highlighting to the div within the li. */
+.ob-symlist > li > div {
     border-left: 0.5rem solid transparent;
     border-radius: 1rem 0 0 1rem;
 }
 
-.ob-symlist > li:hover {
+.ob-symlist > li:hover > div {
     background-color: rgba(127,127,127,0.5);
 }
 
-.ob-symlist-selected {
+.ob-symlist-selected > div {
     background-color: var(--bs-primary) !important; /* Override :hover */
     color: white;
 }

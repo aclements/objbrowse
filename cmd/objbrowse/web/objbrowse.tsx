@@ -4,7 +4,7 @@
  * license that can be found in the LICENSE file.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./objbrowse.css";
 
@@ -95,29 +95,37 @@ function SymPanel(props: SymPanelProps) {
 interface SymListProps { filter: RegExp, value: MaybeEntity, onSelect: (ent: MaybeEntity) => void }
 
 function SymList(props: SymListProps) {
+    // Scroll when the selected entity changes.
+    const selectedElt = useRef<HTMLLIElement>(null);
+    useEffect(() => {
+        if (selectedElt.current !== null) {
+            selectedElt.current.scrollIntoView({ block: "nearest" });
+        }
+    }, [props.value]);
+
+    // Fetch symbol list.
     const symsJSON = useFetchJSON("/syms");
     if (symsJSON.pending) {
         return <div className="mx-3">{symsJSON.pending}</div>;
     }
     const syms: string[] = symsJSON.value;
+
     // TODO: Indicate symbol type? Perhaps to the left of the symbol?
     //
     // TODO: Display columns with much more symbol information? I would probably
     // have to limit the symbol name length and make the SymPanel expandable.
     return (
-        <div className="ob-symlist-outer">
-            <ul className="ob-symlist list-unstyled text-nowrap">
-                {syms.map((data, id) => {
-                    if (props.filter.test(data)) {
-                        let cls = "";
-                        if (props.value !== null && props.value.type == "sym" && props.value.id == id) {
-                            cls = "ob-symlist-selected";
-                        }
-                        return <li key={id} onClick={() => props.onSelect({ type: "sym", id: id })} className={cls}> {data}</li>;
+        <ul className="ob-symlist list-unstyled text-nowrap">
+            {syms.map((name, id) => {
+                if (props.filter.test(name)) {
+                    let extra = null;
+                    if (props.value !== null && props.value.type == "sym" && props.value.id == id) {
+                        extra = { className: "ob-symlist-selected", ref: selectedElt };
                     }
-                })}
-            </ul >
-        </div>
+                    return <li key={id} onClick={() => props.onSelect({ type: "sym", id: id })} {...extra}><div>{name}</div></li>;
+                }
+            })}
+        </ul >
     );
 }
 
