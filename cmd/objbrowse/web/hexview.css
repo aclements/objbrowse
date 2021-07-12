@@ -19,10 +19,10 @@
     background: white; /* Cover rows when this sticks over them */
 }
 
-.hv-table td:first-child {
+.hv-addr {
     color: var(--ob-addr-color);
-    user-select: none;
     text-align: right;
+    user-select: none;
 }
 
 .hv-table td, .hv-table th {

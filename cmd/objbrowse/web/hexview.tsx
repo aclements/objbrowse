@@ -85,33 +85,43 @@ function HexViewer(props: ViewProps) {
     // into view. The grid would also make it easy to keep the selection
     // order as desired.
 
-    const [addrs, hex, ascii] = format(v.Data, dataStart, startOffset, props.value.ranges);
+    const [addrs, offsets, hex, ascii] = format(v.Data, dataStart, startOffset, props.value.ranges);
 
     const addrWidth = 2 + (dataStart + BigInt(len)).toString(16).length;
+    const offsetWidth = 3 + len.toString(16).length;
     return (
         <div>
             <table ref={tableRef} className="hv-table" >
                 <colgroup>
                     <col style={{ width: addrWidth + "ch" }}></col>
+                    <col style={{ width: offsetWidth + "ch" }}></col>
                     <col style={{ width: (3 * 16) + "ch" }}></col>
                     <col style={{ width: "16ch" }}></col>
                 </colgroup>
-                <thead><tr><th></th><th>{hexHead}</th><th>{asciiHead}</th></tr></thead>
-                <tbody><tr><td>{addrs}</td><td>{hex}</td><td>{ascii}</td></tr></tbody>
+                <thead><tr><th></th><th></th><th>{hexHead}</th><th>{asciiHead}</th></tr></thead>
+                <tbody><tr>
+                    <td className="hv-addr">{addrs}</td>
+                    <td className="hv-addr">{offsets}</td>
+                    <td>{hex}</td>
+                    <td>{ascii}</td>
+                </tr></tbody>
             </table>
         </div>);
 }
 
 /**
- * Format formats data as an address column, a hex column, and an ASCII column.
+ * Format formats data as an address column, an offsets column, a hex
+ * column, and an ASCII column.
  * @param dataStart is the address of data[0].
- * @param startOffset is the offset from dataStart at which the table begins. This will be 0 or negative.
+ * @param startOffset is the offset from dataStart at which the table
+ * begins. This will be 0 or negative.
  * @param highlight is the set of ranges to select in the output.
  */
 function format(data: string, dataStart: bigint, startOffset: number, highlight: Ranges) {
     const dataLen = data.length / 2;
 
     let addrs = "";
+    let offsets = "";
     let line = "";
     let ascii = "";
 
@@ -139,6 +149,7 @@ function format(data: string, dataStart: bigint, startOffset: number, highlight:
             line += "  ";
         } else if (col == 0 && i != 0) {
             addrs += "\n";
+            offsets += "\n";
             line += "\n";
             ascii += "\n";
         } else if (i > 0) {
@@ -147,6 +158,10 @@ function format(data: string, dataStart: bigint, startOffset: number, highlight:
 
         if (col == 0) {
             addrs += "0x" + (dataStart + BigInt(dataOffset)).toString(16);
+            if (startOffset + i >= 0) {
+                // Omit the offset on the first row if it would be negative.
+                offsets += "+0x" + (startOffset + i).toString(16);
+            }
         }
 
         if (dataOffset < 0) {
@@ -190,7 +205,7 @@ function format(data: string, dataStart: bigint, startOffset: number, highlight:
         return <>{out}</>;
     };
 
-    return [addrs, doHighlight(line, lineHighlights), doHighlight(ascii, asciiHighlights)];
+    return [addrs, offsets, doHighlight(line, lineHighlights), doHighlight(ascii, asciiHighlights)];
 }
 
 export const HexView = { element: HexViewer, id: "hex", label: "Hex" };
