@@ -26,5 +26,6 @@
 }
 
 .hv-table td, .hv-table th {
-    padding-right: 1rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
 }

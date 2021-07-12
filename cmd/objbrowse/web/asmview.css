@@ -5,7 +5,8 @@
  */
 
 .av-table td {
-    padding-right: 1rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
 }
 
 .av-addr {
@@ -18,4 +19,8 @@
 
 .av-inst {
     white-space: nowrap;
+}
+
+tr.av-selected {
+    background: #b4d2ff;
 }
