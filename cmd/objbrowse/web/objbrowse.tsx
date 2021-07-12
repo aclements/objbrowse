@@ -162,14 +162,23 @@ function EntityPanel(props: EntityPanelProps) {
                         <span className="nav-link" onClick={() => props.onSelectView(View.id)}>{View.label}</span>
                 )}
             </nav>
-            {props.views.map((View) =>
-                // We make the entity key part of the view key so
-                // the element gets completely reset when the entity
-                // changes.
-                <div key={`${View.id} ${entityKey(props.value.entity)}`} className="p-3" style={{ display: View.id == props.view ? "block" : "none" }}>
-                    <View.element value={props.value} onSelect={props.onSelect}></View.element>
-                </div>
-            )}
+            {/* The outer div fills the space */}
+            <div>
+                {props.views.map((View) =>
+                    // The middle div controls visibility and creates a
+                    // separate scroll region for each view.
+                    //
+                    // We make the entity key part of the view key so
+                    // the element gets completely reset when the entity
+                    // changes.
+                    <div key={`${View.id} ${entityKey(props.value.entity)}`} style={{ display: View.id == props.view ? "block" : "none" }}>
+                        {/* The inner div creates padding within the scroll region */}
+                        <div className="p-3">
+                            <View.element value={props.value} onSelect={props.onSelect}></View.element>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

@@ -84,9 +84,16 @@
 }
 
 .ob-view-container > div {
-    /* Expand to the rest of the height */
+    /* Expand to the rest of the space */
     flex: 1 1 auto;
+    /* ... without overflowing it. */
+    overflow: hidden;
+}
+
+.ob-view-container > div > div {
+    height: 100%;
     overflow: scroll;
+    overflow: overlay; /* Webkit: show content under scrollbars */
 }
 
 .ob-selected {

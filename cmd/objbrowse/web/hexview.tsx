@@ -16,6 +16,10 @@ type json = { Addr: string, Data: string }
 
 function HexViewer(props: ViewProps) {
     // Scroll selection into view when it changes.
+    //
+    // TODO: This appears to not work when the view is display: none, so
+    // only the current view successfully scrolls. (asmview has the same
+    // problem.)
     const tableRef = useRef<HTMLTableElement>(null);
     useEffect(() => {
         if (tableRef.current !== null) {
@@ -84,15 +88,18 @@ function HexViewer(props: ViewProps) {
     const [addrs, hex, ascii] = format(v.Data, dataStart, startOffset, props.value.ranges);
 
     const addrWidth = 2 + (dataStart + BigInt(len)).toString(16).length;
-    return (<table ref={tableRef} className="hv-table" >
-        <colgroup>
-            <col style={{ width: addrWidth + "ch" }}></col>
-            <col style={{ width: (3 * 16) + "ch" }}></col>
-            <col style={{ width: "16ch" }}></col>
-        </colgroup>
-        <thead><tr><th></th><th>{hexHead}</th><th>{asciiHead}</th></tr></thead>
-        <tbody><tr><td>{addrs}</td><td>{hex}</td><td>{ascii}</td></tr></tbody>
-    </table>);
+    return (
+        <div>
+            <table ref={tableRef} className="hv-table" >
+                <colgroup>
+                    <col style={{ width: addrWidth + "ch" }}></col>
+                    <col style={{ width: (3 * 16) + "ch" }}></col>
+                    <col style={{ width: "16ch" }}></col>
+                </colgroup>
+                <thead><tr><th></th><th>{hexHead}</th><th>{asciiHead}</th></tr></thead>
+                <tbody><tr><td>{addrs}</td><td>{hex}</td><td>{ascii}</td></tr></tbody>
+            </table>
+        </div>);
 }
 
 /**
