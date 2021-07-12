@@ -4,18 +4,27 @@
  * license that can be found in the LICENSE file.
  */
 
-import React from "react";
+import React, { useRef, useEffect } from "react";
 
 import { ViewProps } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
+import { Ranges } from "./ranges";
 
 import "./hexview.css";
 
 type json = { Addr: string, Data: string }
 
-// TODO: Jump to/highlight selected range.
-
 function HexViewer(props: ViewProps) {
+    // Scroll selection into view when it changes.
+    const tableRef = useRef<HTMLTableElement>(null);
+    useEffect(() => {
+        if (tableRef.current !== null) {
+            const first = tableRef.current.querySelector(".ob-selected");
+            first?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    }, [props.value]);
+
+    // Fetch data.
     const fetch = useFetchJSON(`/sym/${props.value.entity.id}/hex`)
     if (fetch.pending) {
         return fetch.pending;
@@ -65,62 +74,116 @@ function HexViewer(props: ViewProps) {
 
     // TODO: Jump to address.
 
-    // TODO: Doing this with long divs would create far fewer DOM elements. If I
-    // layout each column in its own inline-block, selection would also be more
-    // natural (though maybe I have to totally override that anyway). OTOH, if
-    // I'm going to the trouble of making this lazy, a table may just be easier
-    // and the cost irrelevant. CSS grid would work well for this.
+    // TODO: Fetch data lazily and render only on scroll. For this I
+    // probably want to break the data into large blocks and place those
+    // in a CSS grid. The blocks can always exist, so I can attach
+    // intersection observers to them and populate them as they come
+    // into view. The grid would also make it easy to keep the selection
+    // order as desired.
 
-    const rows: React.ReactElement[] = [];
-    for (let off = startOffset; off < len; off += 16) {
-        const [hex, ascii] = formatLine(v.Data, off);
-        rows.push(
-            <tr key={off}>
-                <td>0x{(dataStart + BigInt(off)).toString(16)}</td>
-                <td>{hex}</td>
-                <td>{ascii}</td>
-            </tr>
-        )
-    }
+    const [addrs, hex, ascii] = format(v.Data, dataStart, startOffset, props.value.ranges);
 
     const addrWidth = 2 + (dataStart + BigInt(len)).toString(16).length;
-    return (<table className="hv-table" >
+    return (<table ref={tableRef} className="hv-table" >
         <colgroup>
             <col style={{ width: addrWidth + "ch" }}></col>
             <col style={{ width: (3 * 16) + "ch" }}></col>
             <col style={{ width: "16ch" }}></col>
         </colgroup>
         <thead><tr><th></th><th>{hexHead}</th><th>{asciiHead}</th></tr></thead>
-        <tbody>{rows}</tbody>
+        <tbody><tr><td>{addrs}</td><td>{hex}</td><td>{ascii}</td></tr></tbody>
     </table>);
 }
 
-function formatLine(data: string, start: number) {
+/**
+ * Format formats data as an address column, a hex column, and an ASCII column.
+ * @param dataStart is the address of data[0].
+ * @param startOffset is the offset from dataStart at which the table begins. This will be 0 or negative.
+ * @param highlight is the set of ranges to select in the output.
+ */
+function format(data: string, dataStart: bigint, startOffset: number, highlight: Ranges) {
     const dataLen = data.length / 2;
+
+    let addrs = "";
     let line = "";
     let ascii = "";
-    for (let i = 0; i < 16 && start + i < dataLen; i++) {
-        if (i == 8) {
+
+    const ranges = highlight.ranges;
+    let rangeIndex = 0;
+    let highlighting = false;
+    let lineHighlights: number[] = [], asciiHighlights: number[] = [];
+    const pushHighlight = () => {
+        lineHighlights.push(line.length);
+        asciiHighlights.push(ascii.length);
+        highlighting = !highlighting;
+    }
+
+    for (let i = 0; startOffset + i < dataLen; i++) {
+        const dataOffset = startOffset + i; // Byte offset in data
+
+        // End highlighting before we add spacing.
+        if (highlighting && ranges[rangeIndex].end <= dataOffset) {
+            pushHighlight();
+            rangeIndex++;
+        }
+
+        const col = i % 16;
+        if (col == 8) {
             line += "  ";
+        } else if (col == 0 && i != 0) {
+            addrs += "\n";
+            line += "\n";
+            ascii += "\n";
         } else if (i > 0) {
             line += " ";
         }
-        if (start + i < 0) {
+
+        if (col == 0) {
+            addrs += "0x" + (dataStart + BigInt(dataOffset)).toString(16);
+        }
+
+        if (dataOffset < 0) {
             // Before the beginning of the data.
             line += "  ";
             ascii += " ";
             continue;
         }
 
-        const hex = data.substr((start + i) * 2, 2);
+        if (!highlighting && ranges.length > rangeIndex && ranges[rangeIndex].start <= dataOffset) {
+            // Start highlighting.
+            pushHighlight();
+        }
+
+        const hex = data.substr((startOffset + i) * 2, 2);
         line += hex;
+
         const val = parseInt(hex, 16);
         if (32 <= val && val <= 126)
             ascii += String.fromCharCode(val);
         else
             ascii += ".";
     }
-    return [line, ascii];
+
+    // Finally, go back and wrap ranges in highlights.
+    if (highlighting) {
+        pushHighlight();
+    }
+    const doHighlight = (text: string, highlights: number[]) => {
+        if (highlights.length == 0) {
+            return <>{text}</>;
+        }
+        let pos = 0;
+        let out = [];
+        for (let i = 0; i < highlights.length; i += 2) {
+            out.push(text.substring(pos, highlights[i]));
+            out.push(<span key={i} className="ob-selected">{text.substring(highlights[i], highlights[i + 1])}</span>)
+            pos = highlights[i + 1];
+        }
+        out.push(text.substring(pos));
+        return <>{out}</>;
+    };
+
+    return [addrs, doHighlight(line, lineHighlights), doHighlight(ascii, asciiHighlights)];
 }
 
 export const HexView = { element: HexViewer, id: "hex", label: "Hex" };

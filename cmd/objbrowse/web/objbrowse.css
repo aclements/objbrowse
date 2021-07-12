@@ -88,3 +88,7 @@
     flex: 1 1 auto;
     overflow: scroll;
 }
+
+.ob-selected {
+    background: #b4d2ff;
+}

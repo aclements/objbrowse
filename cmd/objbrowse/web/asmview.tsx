@@ -24,7 +24,7 @@ function AsmViewer(props: ViewProps) {
     const tableRef = useRef<HTMLTableElement>(null);
     useEffect(() => {
         if (tableRef.current !== null) {
-            const first = tableRef.current.querySelector(".av-selected");
+            const first = tableRef.current.querySelector(".ob-selected");
             first?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
     }, [props.value]);
@@ -56,7 +56,7 @@ function AsmViewer(props: ViewProps) {
 
         let className = "";
         if (props.value.ranges.anyIntersection(range)) {
-            className = "av-selected";
+            className = "ob-selected";
         }
 
         rows.push(
