@@ -10,7 +10,7 @@ import { ViewProps, Entity, Selection } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
 
 import "./asmview.css";
-import { Ranges } from "./ranges";
+import { Ranges, Range } from "./ranges";
 
 type json = { Insts: inst[], Refs: symRef[], LastPC: string }
 type inst = { PC: string, Op: string, Args: string, Control?: control }
@@ -38,21 +38,23 @@ function AsmViewer(props: ViewProps) {
 
     // Parse PCs and compute lengths of all instructions.
     let pcs: bigint[] = [];
-    let lens: number[] = [];
+    let ranges: Range[] = [];
     for (let i = 0; i < v.Insts.length; i++) {
         pcs.push(BigInt("0x" + v.Insts[i].PC));
     }
     pcs.push(BigInt("0x" + v.LastPC));
     for (let i = 0; i < v.Insts.length; i++) {
-        lens.push(Number(pcs[i + 1] - pcs[i]));
+        ranges.push({ start: Number(pcs[i] - pcs[0]), end: Number(pcs[i + 1] - pcs[0]) });
     }
+    // Ranges will sort this by start, but that's okay because it's
+    // already sorted by start.
+    let rangeMap = new Ranges(ranges);
 
     // Create the instruction rows.
     const rows: React.ReactElement[] = [];
     for (let i = 0; i < v.Insts.length; i++) {
         const inst = v.Insts[i];
-        const pcDelta = Number(pcs[i] - pcs[0]);
-        const range = { start: pcDelta, end: pcDelta + lens[i] };
+        const range = ranges[i];
 
         let className = "";
         if (props.value.ranges.anyIntersection(range)) {
@@ -62,9 +64,9 @@ function AsmViewer(props: ViewProps) {
         rows.push(
             <tr key={i} className={className}>
                 <td className="av-addr">0x{inst.PC}</td>
-                <td className="av-addr">+0x{pcDelta.toString(16)}</td>
+                <td className="av-addr">+0x{range.start.toString(16)}</td>
                 <td className="av-inst">{inst.Op}</td>
-                <td className="av-inst">{formatArgs(inst.Args, v.Refs, props.onSelect)}</td>
+                <td className="av-inst">{formatArgs(inst.Args, v.Refs, rangeMap, props.value.entity.id, props.onSelect)}</td>
             </tr>
         );
     }
@@ -72,8 +74,9 @@ function AsmViewer(props: ViewProps) {
     return <table ref={tableRef} className="av-table"><tbody>{rows}</tbody></table>;
 }
 
-function formatArgs(args: string, symRefs: symRef[], onSelect: (sel: Selection) => void): React.ReactElement {
+function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, selfID: number, onSelect: (sel: Selection) => void): React.ReactElement {
     if (!args.includes("\u00ab")) {
+        // No symbolic references.
         return <>{args}</>;
     }
 
@@ -93,8 +96,11 @@ function formatArgs(args: string, symRefs: symRef[], onSelect: (sel: Selection) 
         }
         parts.push(<a key={start} href="#" onClick={(ev) => {
             const entity: Entity = { type: "sym", id: sym.ID };
-            const ranges = new Ranges([{ start: offset, end: offset + 1 }]);
-            onSelect({ entity, ranges });
+            // If this is a reference to our own symbol, find the range
+            // containing offset so we can select the whole instruction.
+            const selfRange = sym.ID == selfID ? ranges.find(offset) : null;
+            const range = selfRange || { start: offset, end: offset + 1 };
+            onSelect({ entity, ranges: new Ranges([range]) });
             ev.preventDefault();
         }}>{text}</a>);
         start = re.lastIndex;
