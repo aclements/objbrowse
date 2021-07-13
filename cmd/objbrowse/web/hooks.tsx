@@ -12,8 +12,8 @@ export type UseFetchJSONResult = { pending: React.ReactElement, error?: string }
 const useFetchJSONPending: UseFetchJSONResult = {
     pending: (
         <div className="d-flex align-items-center">
-            <strong>Loading...</strong>
-            <div className="spinner-border ms-auto" role="status" aria-hidden="true"></div>
+            <strong className="mx-3">Loading...</strong>
+            <div className="spinner-border ms-auto mx-3" role="status" aria-hidden="true"></div>
         </div>
     ),
 };

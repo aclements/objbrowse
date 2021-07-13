@@ -51,7 +51,7 @@ func newServer(f obj.File, host string, static fs.FS) (*server, error) {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(static)))
-	mux.Handle("/syms", http.HandlerFunc(s.serveSyms))
+	mux.Handle("/index", http.HandlerFunc(s.serveIndex))
 	mux.Handle("/sym/", http.HandlerFunc(s.serveSym))
 	// TODO: Also provide an index over sections and maybe even a view
 	// over the whole object.
@@ -72,14 +72,38 @@ func (s *server) serve() error {
 	return http.Serve(s.listener, s.mux)
 }
 
-func (s *server) serveSyms(w http.ResponseWriter, req *http.Request) {
+type indexJSON struct {
+	Views []string
+	Syms  struct {
+		Names []string
+		Views []int // Bit mask over Views list
+	}
+}
+
+func (s *server) serveIndex(w http.ResponseWriter, req *http.Request) {
+	var js indexJSON
+
+	for _, view := range s.views {
+		js.Views = append(js.Views, view.Name())
+	}
+
 	n := s.Obj.NumSyms()
-	names := make([]string, 0, n)
+	js.Syms.Names = make([]string, 0, n)
+	js.Syms.Views = make([]int, 0, n)
 	for i := obj.SymID(0); i < n; i++ {
 		sym := s.Obj.Sym(i)
-		names = append(names, sym.Name)
+		js.Syms.Names = append(js.Syms.Names, sym.Name)
+
+		viewSet := 0
+		for viewI, view := range s.views {
+			if view.View(&sym) != nil {
+				viewSet |= 1 << viewI
+			}
+		}
+		js.Syms.Views = append(js.Syms.Views, viewSet)
 	}
-	serveJSON(w, names)
+
+	serveJSON(w, &js)
 }
 
 // symURLRe matches symbol queries, which must be of the form /sym/{id}/{view}.

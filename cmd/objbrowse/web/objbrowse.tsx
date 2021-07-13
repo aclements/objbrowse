@@ -31,20 +31,56 @@ export interface View {
 
 export interface AppProps { views: View[] }
 
+type indexJSON = {
+    Views: string[];
+    Syms: { Names: string[], Views: number[] };
+}
+
 export function App(props: AppProps) {
     // TODO: Sync current entity (and selected range in that entity) to the URL
     // history.
     const [selected, setSelected] = useState<Selection | undefined>(undefined);
+    const [validViews, setValidViews] = useState<View[]>([]);
     const [view, setView] = useState("");
 
+    // Get object index.
+    const indexJSON = useFetchJSON("/index");
+    if (indexJSON.pending) {
+        return <div className="d-flex justify-content-center align-items-center" style={{ height: "100vh" }}>
+            {indexJSON.pending}
+        </div>;
+    }
+    const index: indexJSON = indexJSON.value;
+
+    // Map our views name to the server view indexes.
+    let viewMap = new Map(props.views.map(view => [view.id, view]));
+    let views: View[] = []; // By server index.
+    for (let i = 0; i < index.Views.length; i++) {
+        let view = viewMap.get(index.Views[i]);
+        if (view !== undefined) {
+            views[i] = view;
+        }
+    }
+
     const setEntity = (entity?: Entity) => {
+        let validViews: View[] = [];
         if (entity === undefined) {
             setSelected(undefined);
-            setView("");
         } else {
             setSelected({ entity, ranges: new Ranges() });
-            // TODO: Not all views are valid. Select the first valid one for this entity.
-            setView(props.views[0].id);
+            // Get valid views for this symbol.
+            const viewSet = index.Syms.Views[entity.id];
+            for (let i = 0; i < views.length; i++) {
+                if (views[i] && (viewSet & (1 << i))) {
+                    validViews.push(views[i]);
+                }
+            }
+        }
+        setValidViews(validViews);
+        if (validViews.length > 0) {
+            setView(validViews[0].id);
+        } else {
+            setView("");
         }
     }
 
@@ -53,11 +89,11 @@ export function App(props: AppProps) {
             <div className="container-fluid">
                 <div className="row flex-xl-nowrap">
                     <div className="col-2 p-0">
-                        <SymPanel entity={selected?.entity} onSelect={setEntity} />
+                        <SymPanel index={index} entity={selected?.entity} onSelect={setEntity} />
                     </div>
                     {selected !== undefined &&
                         <div className="col-10 p-0">
-                            <EntityPanel views={props.views} view={view} onSelectView={setView} value={selected} onSelect={setSelected} />
+                            <EntityPanel views={validViews} view={view} onSelectView={setView} value={selected} onSelect={setSelected} />
                         </div>
                     }
                 </div>
@@ -66,7 +102,11 @@ export function App(props: AppProps) {
     );
 }
 
-interface SymPanelProps { entity?: Entity, onSelect: (ent?: Entity) => void }
+interface SymPanelProps {
+    index: indexJSON,
+    entity?: Entity;
+    onSelect: (ent?: Entity) => void;
+}
 
 function SymPanel(props: SymPanelProps) {
     const [filterStr, setFilterStr] = useState("");
@@ -98,12 +138,17 @@ function SymPanel(props: SymPanelProps) {
             // Don't add left or right margin. The SymList rows add their own.
         }
         <div className="my-3">
-            <SymList filter={filter} entity={props.entity} onSelect={props.onSelect} />
+            <SymList index={props.index} filter={filter} entity={props.entity} onSelect={props.onSelect} />
         </div>
     </div >);
 }
 
-interface SymListProps { filter: RegExp, entity?: Entity, onSelect: (ent?: Entity) => void }
+interface SymListProps {
+    index: indexJSON;
+    filter: RegExp;
+    entity?: Entity;
+    onSelect: (ent?: Entity) => void;
+}
 
 function SymList(props: SymListProps) {
     // Scroll when the selected entity changes.
@@ -114,20 +159,13 @@ function SymList(props: SymListProps) {
         }
     }, [props.entity]);
 
-    // Fetch symbol list.
-    const symsJSON = useFetchJSON("/syms");
-    if (symsJSON.pending) {
-        return <div className="mx-3">{symsJSON.pending}</div>;
-    }
-    const syms: string[] = symsJSON.value;
-
     // TODO: Indicate symbol type? Perhaps to the left of the symbol?
     //
     // TODO: Display columns with much more symbol information? I would probably
     // have to limit the symbol name length and make the SymPanel expandable.
     return (
         <ul className="ob-symlist list-unstyled text-nowrap">
-            {syms.map((name, id) => {
+            {props.index.Syms.Names.map((name, id) => {
                 if (props.filter.test(name)) {
                     let extra = null;
                     if (props.entity?.type == "sym" && props.entity.id == id) {
@@ -149,8 +187,6 @@ interface EntityPanelProps {
 }
 
 function EntityPanel(props: EntityPanelProps) {
-    // TODO: This just loops over all the views, but I need to present
-    // just the views that support the current entity.
     return (
         <div className="ob-view-container">
             {/* padding-left extends the bottom border to the left */}
@@ -158,8 +194,8 @@ function EntityPanel(props: EntityPanelProps) {
             <nav className="nav nav-tabs ps-3 pt-3">
                 {props.views.map((View) =>
                     View.id == props.view ?
-                        <span className="nav-link active" aria-current="page">{View.label}</span> :
-                        <span className="nav-link" onClick={() => props.onSelectView(View.id)}>{View.label}</span>
+                        <span key={View.id} className="nav-link active" aria-current="page">{View.label}</span> :
+                        <span key={View.id} className="nav-link" onClick={() => props.onSelectView(View.id)}>{View.label}</span>
                 )}
             </nav>
             {/* The outer div fills the space */}
