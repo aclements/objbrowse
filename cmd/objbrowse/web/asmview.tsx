@@ -80,13 +80,13 @@ function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, selfID: num
         return <>{args}</>;
     }
 
-    let parts: React.ReactElement[] = [];
+    let parts: (React.ReactElement | string)[] = [];
     let re = /\u00ab(\d+)\+([0-9a-fA-F]+)\u00bb/g;
     let start = 0;
     let m;
     while ((m = re.exec(args)) !== null) {
         if (m.index > 0) {
-            parts.push(<>{args.substring(start, m.index)}</>);
+            parts.push(args.substring(start, m.index));
         }
         const sym = symRefs[parseInt(m[1], 10)];
         const offset = parseInt(m[2], 16);
@@ -106,7 +106,7 @@ function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, selfID: num
         start = re.lastIndex;
     }
     // Remainder of argument.
-    parts.push(<>{args.substring(start)}</>);
+    parts.push(args.substring(start));
     return <>{parts}</>;
 }
 
