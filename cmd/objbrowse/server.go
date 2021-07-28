@@ -6,14 +6,17 @@ package main
 
 import (
 	"bytes"
+	"debug/dwarf"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log"
 	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 
+	"github.com/aclements/go-obj/dbg"
 	"github.com/aclements/go-obj/obj"
 	"github.com/aclements/go-obj/symtab"
 )
@@ -26,6 +29,10 @@ type View interface {
 type server struct {
 	Obj    obj.File
 	SymTab *symtab.Table
+
+	Dwarf    *dwarf.Data
+	Dbg      *dbg.Data
+	DbgError error // If Dbg == nil, the error loading debug info
 
 	listener net.Listener
 	mux      http.Handler
@@ -48,6 +55,18 @@ func newServer(f obj.File, host string, static fs.FS) (*server, error) {
 	}
 	obj.SynthesizeSizes(syms)
 	s.SymTab = symtab.NewTable(syms)
+
+	// Get debug info.
+	if f, ok := f.(obj.AsDebugDwarf); ok {
+		s.Dwarf, err = f.AsDebugDwarf()
+		if err == nil {
+			s.Dbg, err = dbg.New(s.Dwarf)
+		}
+		if err != nil {
+			log.Printf("error reading DWARF debug info: %v", err)
+			s.DbgError = err
+		}
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(static)))

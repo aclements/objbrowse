@@ -8,12 +8,13 @@ import React from "react";
 import ReactDOM from "react-dom";
 
 import { App } from "./objbrowse";
-import { HexView } from "./hexview";
+import { SourceView } from "./sourceview";
 import { AsmView } from "./asmview";
+import { HexView } from "./hexview";
 
 function main() {
     ReactDOM.render(
-        <App views={[AsmView, HexView]} />,
+        <App views={[SourceView, AsmView, HexView]} />,
         document.getElementById('root')
     );
 }

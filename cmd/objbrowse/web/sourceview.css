@@ -1,0 +1,26 @@
+/** @license ObjBrowse
+ * Copyright 2021 The Go Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+
+ .sv-table {
+     margin-bottom: 1rem;
+ }
+
+ .sv-table td {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+.sv-line {
+    font-family: var(--bs-font-monospace);
+    color: var(--ob-addr-color);
+    text-align: right;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.sv-src {
+    white-space: pre;
+}

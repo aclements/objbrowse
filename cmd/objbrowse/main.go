@@ -59,6 +59,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to start server: %s", err)
 	}
+	server.addView(NewSourceView(server))
 	server.addView(NewAsmView(server))
 	server.addView(NewHexView(server))
 
