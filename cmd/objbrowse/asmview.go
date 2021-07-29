@@ -66,6 +66,7 @@ type controlJSON struct {
 type symRefJSON struct {
 	ID   obj.SymID
 	Name string
+	Addr AddrJS
 }
 
 func (v *AsmView) View(entity interface{}) http.HandlerFunc {
@@ -96,7 +97,7 @@ func (v *AsmView) View(entity interface{}) http.HandlerFunc {
 			ref, ok := symRefMap[symID]
 			if !ok {
 				ref = len(symRefs)
-				symRefs = append(symRefs, symRefJSON{symID, sym.Name})
+				symRefs = append(symRefs, symRefJSON{symID, sym.Name, AddrJS(sym.Value)})
 				symRefMap[symID] = ref
 			}
 			offset := addr - sym.Value

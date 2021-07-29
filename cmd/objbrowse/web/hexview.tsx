@@ -126,7 +126,7 @@ function format(data: string, dataStart: bigint, startOffset: number, highlight:
         const dataOffset = startOffset + i; // Byte offset in data
 
         // End highlighting before we add spacing.
-        if (highlighting && ranges[rangeIndex].end <= dataOffset) {
+        if (highlighting && ranges[rangeIndex].end - dataStart <= dataOffset) {
             pushHighlight();
             rangeIndex++;
         }
@@ -158,7 +158,7 @@ function format(data: string, dataStart: bigint, startOffset: number, highlight:
             continue;
         }
 
-        if (!highlighting && ranges.length > rangeIndex && ranges[rangeIndex].start <= dataOffset) {
+        if (!highlighting && ranges.length > rangeIndex && ranges[rangeIndex].start - dataStart <= dataOffset) {
             // Start highlighting.
             pushHighlight();
         }

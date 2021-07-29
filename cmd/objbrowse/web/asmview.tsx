@@ -14,7 +14,7 @@ import "./asmview.css";
 
 type json = { Insts: inst[], Refs: symRef[], LastPC: string }
 type inst = { PC: string, Op: string, Args: string, Control?: control }
-type symRef = { ID: number, Name: string }
+type symRef = { ID: number, Name: string, Addr: string }
 type control = { Type: number, Conditional: boolean, TargetPC: string }
 
 // TODO: Implement selecting an instruction or range of instructions.
@@ -45,7 +45,7 @@ function AsmViewer(props: ViewProps) {
     }
     pcs.push(BigInt("0x" + v.LastPC));
     for (let i = 0; i < v.Insts.length; i++) {
-        ranges.push({ start: Number(pcs[i] - pcs[0]), end: Number(pcs[i + 1] - pcs[0]) });
+        ranges.push({ start: pcs[i], end: pcs[i + 1] });
     }
     // Ranges will sort this by start, but that's okay because it's
     // already sorted by start.
@@ -65,7 +65,7 @@ function AsmViewer(props: ViewProps) {
         rows.push(
             <tr key={i} className={className}>
                 <td className="av-addr">0x{inst.PC}</td>
-                <td className="av-addr">+0x{range.start.toString(16)}</td>
+                <td className="av-addr">+0x{(pcs[i] - pcs[0]).toString(16)}</td>
                 <td className="av-inst">{inst.Op}</td>
                 <td className="av-inst">{formatArgs(inst.Args, v.Refs, rangeMap, props.value.entity.id, props.onSelect)}</td>
             </tr>
@@ -97,10 +97,11 @@ function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, selfID: num
         }
         parts.push(<a key={start} href="#" onClick={(ev) => {
             const entity: Entity = { type: "sym", id: sym.ID };
+            const addr = BigInt("0x" + sym.Addr) + BigInt(offset);
             // If this is a reference to our own symbol, find the range
             // containing offset so we can select the whole instruction.
-            const selfRange = sym.ID == selfID ? ranges.find(offset) : null;
-            const range = selfRange || { start: offset, end: offset + 1 };
+            const selfRange = sym.ID == selfID ? ranges.find(addr) : null;
+            const range = selfRange || { start: addr, end: addr + BigInt(1) };
             onSelect({ entity, ranges: new Ranges([range]) });
             ev.preventDefault();
         }}>{text}</a>);

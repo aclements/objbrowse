@@ -4,7 +4,7 @@
  * license that can be found in the LICENSE file.
  */
 
-export type Range = { start: number, end: number }
+export type Range = { start: bigint, end: bigint }
 
 /**
  * Ranges is a set of intervals.
@@ -21,7 +21,7 @@ export class Ranges {
             return;
         }
         // Sort ranges.
-        ranges.sort((a, b) => a.start - b.start);
+        ranges.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
         this.ranges = ranges;
     }
 
@@ -29,7 +29,7 @@ export class Ranges {
      * index returns the index of the first range that ends after val,
      * or ranges.length if none do. It may or may not contain val.
      */
-    private index(val: number) {
+    private index(val: bigint) {
         let lo = 0, hi = this.ranges.length;
         while (lo < hi) {
             let mid = Math.floor((lo + hi) / 2);
@@ -44,7 +44,7 @@ export class Ranges {
     /**
      * find returns the range containing point, or null.
      */
-    find(point: number): Range | null {
+    find(point: bigint): Range | null {
         const i = this.index(point);
         if (i < this.ranges.length && contains(this.ranges[i], point)) {
             return this.ranges[i];
@@ -81,6 +81,6 @@ function overlaps(r1: Range, r2: Range): boolean {
     return r1.end > r2.start && r1.start < r2.end;
 }
 
-function contains(r: Range, point: number): boolean {
+function contains(r: Range, point: bigint): boolean {
     return r.start <= point && point < r.end;
 }
