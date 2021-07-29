@@ -40,7 +40,12 @@ export function useFetchJSON(url: string): UseFetchJSONResult {
             try {
                 const res = await fetch(url, { signal });
                 if (!res.ok) {
-                    throw `${res.status} ${res.statusText}`
+                    if (res.status === 500) {
+                        // The server indicates view problems with 500's
+                        // and meaningful text. Show the text.
+                        throw await res.text();
+                    }
+                    throw `${res.status} ${res.statusText}`;
                 } else {
                     const val = await res.json();
                     setRes({ pending: false, value: val });
@@ -51,6 +56,10 @@ export function useFetchJSON(url: string): UseFetchJSONResult {
                     // one. Go back to "pending" state.
                     setRes(useFetchJSONPending);
                 } else {
+                    if (e instanceof TypeError) {
+                        // Fetch network error. Don't show the "TypeError" part.
+                        e = e.message
+                    }
                     console.log(`fetching ${url}: ${e}`);
                     setRes({ error: String(e), pending: <div className="alert alert-danger" role="alert">Error: {String(e)}</div> });
                 }
