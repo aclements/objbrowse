@@ -93,7 +93,7 @@ export function App(props: AppProps) {
                     </div>
                     {selected !== undefined &&
                         <div className="col-10 p-0">
-                            <EntityPanel views={validViews} view={view} onSelectView={setView} value={selected} onSelect={setSelected} />
+                            <EntityPanel views={validViews} viewID={view} onSelectView={setView} value={selected} onSelect={setSelected} />
                         </div>
                     }
                 </div>
@@ -180,7 +180,7 @@ function SymList(props: SymListProps) {
 
 interface EntityPanelProps {
     views: View[];
-    view: string;
+    viewID: string;
     onSelectView: (view: string) => void;
     value: Selection;
     onSelect: (sel: Selection) => void;
@@ -193,28 +193,48 @@ function EntityPanel(props: EntityPanelProps) {
             {/* padding-top keeps it in place when scrolling */}
             <nav className="nav nav-tabs ps-3 pt-3">
                 {props.views.map((View) =>
-                    View.id == props.view ?
+                    View.id == props.viewID ?
                         <span key={View.id} className="nav-link active" aria-current="page">{View.label}</span> :
                         <span key={View.id} className="nav-link" onClick={() => props.onSelectView(View.id)}>{View.label}</span>
                 )}
             </nav>
             {/* The outer div fills the space */}
             <div>
-                {props.views.map((View) =>
-                    // The middle div controls visibility and creates a
-                    // separate scroll region for each view.
-                    //
+                {props.views.map((view) =>
                     // We make the entity key part of the view key so
                     // the element gets completely reset when the entity
                     // changes.
-                    <div key={`${View.id} ${entityKey(props.value.entity)}`} style={{ display: View.id == props.view ? "block" : "none" }}>
-                        {/* The inner div creates padding within the scroll region */}
-                        <div className="p-3">
-                            <View.element value={props.value} onSelect={props.onSelect}></View.element>
-                        </div>
-                    </div>
+                    <EntityView key={`${view.id} ${entityKey(props.value.entity)}`}
+                        view={view} current={view.id == props.viewID} value={props.value} onSelect={props.onSelect} />
                 )}
             </div>
         </div>
     );
+}
+
+interface EntityViewProps extends ViewProps {
+    view: View;
+    current: boolean;
+}
+
+function EntityView(props: EntityViewProps) {
+    // TODO: This appears to not work when the view is display: none, so
+    // only the current view successfully scrolls.
+    const domRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (domRef.current !== null) {
+            const first = domRef.current.querySelector(".ob-selected");
+            first?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    }, [props.value]);
+
+    const View = props.view;
+    // The middle div controls visibility and creates a separate scroll
+    // region for each view.
+    return (<div ref={domRef} style={{ display: props.current ? "block" : "none" }}>
+        {/* The inner div creates padding within the scroll region */}
+        <div className="p-3">
+            <View.element value={props.value} onSelect={props.onSelect}></View.element>
+        </div>
+    </div>);
 }

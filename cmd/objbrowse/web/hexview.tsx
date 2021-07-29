@@ -4,7 +4,7 @@
  * license that can be found in the LICENSE file.
  */
 
-import React, { useRef, useEffect } from "react";
+import React from "react";
 
 import { ViewProps } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
@@ -15,19 +15,6 @@ import "./hexview.css";
 type json = { Addr: string, Data: string }
 
 function HexViewer(props: ViewProps) {
-    // Scroll selection into view when it changes.
-    //
-    // TODO: This appears to not work when the view is display: none, so
-    // only the current view successfully scrolls. (asmview has the same
-    // problem.)
-    const tableRef = useRef<HTMLTableElement>(null);
-    useEffect(() => {
-        if (tableRef.current !== null) {
-            const first = tableRef.current.querySelector(".ob-selected");
-            first?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-    }, [props.value]);
-
     // Fetch data.
     const fetch = useFetchJSON(`/sym/${props.value.entity.id}/hex`)
     if (fetch.pending) {
@@ -91,7 +78,7 @@ function HexViewer(props: ViewProps) {
     const offsetWidth = 3 + len.toString(16).length;
     return (
         <div>
-            <table ref={tableRef} className="hv-table" >
+            <table className="hv-table" >
                 <colgroup>
                     <col style={{ width: addrWidth + "ch" }}></col>
                     <col style={{ width: offsetWidth + "ch" }}></col>

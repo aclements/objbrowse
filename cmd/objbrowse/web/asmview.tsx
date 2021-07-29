@@ -4,13 +4,13 @@
  * license that can be found in the LICENSE file.
  */
 
-import React, { useRef, useEffect } from "react";
+import React from "react";
 
 import { ViewProps, Entity, Selection } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
+import { Ranges, Range } from "./ranges";
 
 import "./asmview.css";
-import { Ranges, Range } from "./ranges";
 
 type json = { Insts: inst[], Refs: symRef[], LastPC: string }
 type inst = { PC: string, Op: string, Args: string, Control?: control }
@@ -19,16 +19,17 @@ type control = { Type: number, Conditional: boolean, TargetPC: string }
 
 // TODO: Implement selecting an instruction or range of instructions.
 
-function AsmViewer(props: ViewProps) {
-    // Scroll selection into view when it changes.
-    const tableRef = useRef<HTMLTableElement>(null);
-    useEffect(() => {
-        if (tableRef.current !== null) {
-            const first = tableRef.current.querySelector(".ob-selected");
-            first?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-    }, [props.value]);
+// TODO: Display control flow. Showing all of the arrows is a little
+// overwhelming. Maybe I should just show outgoing/incoming arrows for
+// the selected (moused-over if no selection) instruction? Doing just
+// mouse-over doesn't help for viewing long jumps. Maybe I always mark
+// instructions that are the target of a jump, just not with the whole
+// arrow.
 
+// TODO: Display source lines for each instruction, including their
+// inline info (on hover or something).
+
+function AsmViewer(props: ViewProps) {
     // Fetch data.
     const fetch = useFetchJSON(`/sym/${props.value.entity.id}/asm`)
     if (fetch.pending) {
@@ -71,7 +72,7 @@ function AsmViewer(props: ViewProps) {
         );
     }
 
-    return <table ref={tableRef} className="av-table"><tbody>{rows}</tbody></table>;
+    return <table className="av-table"><tbody>{rows}</tbody></table>;
 }
 
 function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, selfID: number, onSelect: (sel: Selection) => void): React.ReactElement {
