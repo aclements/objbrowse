@@ -37,8 +37,11 @@ type indexJSON = {
 }
 
 export function App(props: AppProps) {
-    // TODO: Sync current entity (and selected range in that entity) to the URL
-    // history.
+    // TODO: Sync current entity (and selected range in that entity) to
+    // the URL history.
+    //
+    // BUG: Following a link from asmview doesn't recompute the valid
+    // views because it calls setSelected directly rather than setEntity.
     const [selected, setSelected] = useState<Selection | undefined>(undefined);
     const [validViews, setValidViews] = useState<View[]>([]);
     const [view, setView] = useState("");
