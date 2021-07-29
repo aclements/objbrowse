@@ -72,25 +72,30 @@
     color: white;
 }
 
-.ob-view-container {
+.ob-entity-panel {
     height: 100vh;
     display: flex;
     flex-flow: column;
 }
 
-.ob-view-container > nav {
+.ob-entity-panel > nav {
     flex: 0 1 auto;
     cursor: pointer;
 }
 
-.ob-view-container > div {
+.ob-entity-panel > div {
     /* Expand to the rest of the space */
     flex: 1 1 auto;
     /* ... without overflowing it. */
     overflow: hidden;
+    /* Allow view children to overlap */
+    position: relative;
 }
 
-.ob-view-container > div > div {
+.ob-entity-panel > div > .ob-entity-view {
+    /* The views overlap within the panel so we can use visibility to hide and show them. */
+    position: absolute;
+    width: 100%;
     height: 100%;
     overflow: scroll;
     overflow: overlay; /* Webkit: show content under scrollbars */

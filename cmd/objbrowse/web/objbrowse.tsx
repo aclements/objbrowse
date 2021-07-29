@@ -188,7 +188,7 @@ interface EntityPanelProps {
 
 function EntityPanel(props: EntityPanelProps) {
     return (
-        <div className="ob-view-container">
+        <div className="ob-entity-panel">
             {/* padding-left extends the bottom border to the left */}
             {/* padding-top keeps it in place when scrolling */}
             <nav className="nav nav-tabs ps-3 pt-3">
@@ -218,23 +218,66 @@ interface EntityViewProps extends ViewProps {
 }
 
 function EntityView(props: EntityViewProps) {
-    // TODO: This appears to not work when the view is display: none, so
-    // only the current view successfully scrolls.
     const domRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
-        if (domRef.current !== null) {
-            const first = domRef.current.querySelector(".ob-selected");
-            first?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        // Scroll the current selection into view.
+        //
+        // We could just use scrollIntoView, but because of a Chrome
+        // bug, we can only smooth scroll one element and we need to
+        // scroll all of the views
+        // (https://bugs.chromium.org/p/chromium/issues/detail?id=833617).
+        // scrollTo doesn't have this problem, and gives us the
+        // opportunity to scroll the whole selection into view and apply
+        // a bit of custom logic.
+        const parent = domRef.current;
+        if (parent !== null) {
+            const selection = parent.querySelectorAll(".ob-selected");
+            scrollToAll(parent, selection);
         }
     }, [props.value]);
 
     const View = props.view;
-    // The middle div controls visibility and creates a separate scroll
-    // region for each view.
-    return (<div ref={domRef} style={{ display: props.current ? "block" : "none" }}>
-        {/* The inner div creates padding within the scroll region */}
-        <div className="p-3">
-            <View.element value={props.value} onSelect={props.onSelect}></View.element>
+    // The ob-entity-view div controls visibility and creates a separate
+    // scroll region this view. We use visibility with absolute
+    // positioning instead of just display:none because we can't scroll
+    // the contents of a display:none block.
+    return (
+        <div ref={domRef} className="ob-entity-view" style={{ visibility: props.current ? "visible" : "hidden" }}>
+            {/* The inner div creates padding within the scroll region */}
+            <div className="p-3">
+                <View.element value={props.value} onSelect={props.onSelect}></View.element>
+            </div>
         </div>
-    </div>);
+    );
+}
+
+function scrollToAll(parent: Element, list: NodeListOf<Element>) {
+    // Get the combined bounding rect of list.
+    let listTop, listBot;
+    for (let node of list) {
+        const nodeRect = node.getBoundingClientRect();
+        if (listTop === undefined || nodeRect.top < listTop) {
+            listTop = nodeRect.top;
+        }
+        if (listBot === undefined || nodeRect.bottom > listBot) {
+            listBot = nodeRect.bottom;
+        }
+    }
+    if (listTop === undefined || listBot === undefined) {
+        return;
+    }
+
+    // Compute how to scroll parent to show list.
+    const parentRect = parent.getBoundingClientRect();
+    // If the top of the list is already visible, don't do anything.
+    if (parentRect.top <= listTop && listTop < parentRect.bottom) {
+        return;
+    }
+    // Center list.
+    let target = listTop - (parentRect.top + parentRect.height / 2) + (listBot - listTop) / 2;
+    // Unless that would scroll the top of list out of view.
+    const margin = 10;
+    target = Math.max(target, margin);
+
+    parent.scrollTo({ top: target, behavior: "smooth" });
 }
