@@ -4,6 +4,10 @@
  * license that can be found in the LICENSE file.
  */
 
+.av-table {
+    min-width: 100%;
+}
+
 .av-table td {
     padding-left: 0.5rem;
     padding-right: 0.5rem;

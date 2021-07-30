@@ -63,12 +63,12 @@ function AsmViewer(props: ViewProps) {
         }
 
         rows.push(
-            <tr key={i} className={className}>
+            <tr key={i} className={className} onClick={() => props.onSelectRange(new Ranges(range))}>
                 <td className="av-addr">0x{inst.PC}</td>
                 <td className="av-addr">+0x{(pcs[i] - pcs[0]).toString(16)}</td>
                 <td className="av-inst">{inst.Op}</td>
                 <td className="av-inst">{formatArgs(inst.Args, v.Refs, rangeMap, props.value.entity.id, props.onSelect)}</td>
-            </tr>
+            </tr >
         );
     }
 

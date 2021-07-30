@@ -15,14 +15,34 @@ export class Ranges {
     // ranges must be an array of objects with "start" and "end"
     // properties, where each object covers a disjoint range [start,
     // end).
-    constructor(ranges?: Range[]) {
+    constructor(ranges?: Range | Range[] | Ranges, sorted?: "sorted") {
         if (ranges === undefined) {
             this.ranges = [];
             return;
         }
-        // Sort ranges.
-        ranges.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+        if (ranges instanceof Ranges) {
+            // Must already be sorted.
+            this.ranges = ranges.ranges;
+            return;
+        }
+        if (!Array.isArray(ranges)) {
+            // No need to sort.
+            ranges = [ranges];
+        } else if (sorted !== "sorted") {
+            // Sort ranges.
+            ranges.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+        }
         this.ranges = ranges;
+    }
+
+    /**
+     * fromStrings returns a Ranges constructed from a list of pairs of
+     * hex strings.
+     */
+    static fromStrings(ranges: string[2][], sorted?: "sorted"): Ranges {
+        return new Ranges(ranges.map(
+            range => ({ start: BigInt("0x" + range[0]), end: BigInt("0x" + range[1]) })
+        ), sorted);
     }
 
     /**

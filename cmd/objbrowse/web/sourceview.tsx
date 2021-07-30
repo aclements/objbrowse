@@ -4,17 +4,16 @@
  * license that can be found in the LICENSE file.
  */
 
-// TODO: Implement selection syncing
-
-import React from "react";
+import React, { useMemo } from "react";
 
 import { ViewProps } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
+import { Ranges } from "./ranges";
 
 import "./sourceview.css";
 
 type json = { Blocks: block[] }
-type block = { Path: string, Func: string, Start: number, Text: string[], PCs: string[][][], Error?: string }
+type block = { Path: string, Func: string, Start: number, Text: string[], PCs: string[2][][], Error?: string }
 
 function SourceViewer(props: ViewProps) {
     // Fetch data.
@@ -25,14 +24,23 @@ function SourceViewer(props: ViewProps) {
     const v: json = fetch.value;
 
     let blocks = v.Blocks.map((val, blockI) => {
-        return <Block key={blockI} block={val}></Block>;
+        return <Block key={blockI} block={val} {...props} />;
     });
 
     return <>{blocks}</>;
 }
 
-function Block(props: { block: block }) {
+interface BlockProps extends ViewProps {
+    block: block
+}
+
+function Block(props: BlockProps) {
     const b = props.block;
+
+    // Map JSON PC ranges to Ranges objects.
+    const ranges = useMemo(
+        () => b.PCs.map(ranges => Ranges.fromStrings(ranges, "sorted")),
+        [b.PCs]);
 
     let slash = b.Path.lastIndexOf("/") + 1;
     let info = (<tr className="sv-path">
@@ -49,11 +57,13 @@ function Block(props: { block: block }) {
     } else {
         rows = b.Text.map((text, line) => {
             let pcs = b.PCs[line];
+            let highlight = ranges[line].anyIntersection(props.value.ranges);
             let cls = "sv-src";
             if (pcs.length === 0) {
                 cls += " text-muted"
             }
-            return (<tr key={line}>
+            return (<tr key={line} className={highlight ? "ob-selected" : ""}
+                onClick={() => props.onSelectRange(ranges[line])}>
                 <td className="sv-line">{b.Start + line}</td>
                 <td className={cls}>{text}</td>
             </tr>);

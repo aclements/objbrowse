@@ -22,6 +22,7 @@ export type Selection = { entity: Entity, ranges: Ranges }
 export interface ViewProps {
     value: Selection;
     onSelect: (ent: Selection) => void;
+    onSelectRange: (range: Ranges) => void;
 }
 export interface View {
     element: (props: ViewProps) => JSX.Element;
@@ -190,6 +191,10 @@ interface EntityPanelProps {
 }
 
 function EntityPanel(props: EntityPanelProps) {
+    const onSelectRange = (range: Ranges) => {
+        props.onSelect({ entity: props.value.entity, ranges: range });
+    }
+
     return (
         <div className="ob-entity-panel">
             {/* padding-left extends the bottom border to the left */}
@@ -208,7 +213,8 @@ function EntityPanel(props: EntityPanelProps) {
                     // the element gets completely reset when the entity
                     // changes.
                     <EntityView key={`${view.id} ${entityKey(props.value.entity)}`}
-                        view={view} current={view.id == props.viewID} value={props.value} onSelect={props.onSelect} />
+                        view={view} current={view.id == props.viewID} value={props.value}
+                        onSelect={props.onSelect} onSelectRange={onSelectRange} />
                 )}
             </div>
         </div>
@@ -248,7 +254,7 @@ function EntityView(props: EntityViewProps) {
         <div ref={domRef} className="ob-entity-view" style={{ visibility: props.current ? "visible" : "hidden" }}>
             {/* The inner div creates padding within the scroll region */}
             <div className="p-3">
-                <View.element value={props.value} onSelect={props.onSelect}></View.element>
+                <View.element value={props.value} onSelect={props.onSelect} onSelectRange={props.onSelectRange}></View.element>
             </div>
         </div>
     );

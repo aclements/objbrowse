@@ -4,9 +4,10 @@
  * license that can be found in the LICENSE file.
  */
 
- .sv-table {
-     margin-bottom: 1rem;
- }
+.sv-table {
+    min-width: 100%;
+    margin-bottom: 1rem;
+}
 
  .sv-table td {
     padding-left: 0.5rem;
