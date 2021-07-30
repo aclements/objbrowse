@@ -164,8 +164,11 @@ func mergeRanges(ranges []Range) []Range {
 	// Merge overlapping ranges.
 	o, i := 0, 1
 	for ; i < len(ranges); i++ {
-		if ranges[o].High <= ranges[i].Low {
-			ranges[o].High = ranges[i].High
+		if ranges[o].High >= ranges[i].Low {
+			// Merge the ranges. o might subsume i.
+			if ranges[i].High > ranges[o].High {
+				ranges[o].High = ranges[i].High
+			}
 		} else {
 			o++
 			ranges[o] = ranges[i]
