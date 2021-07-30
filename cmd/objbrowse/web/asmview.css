@@ -8,6 +8,11 @@
     min-width: 100%;
 }
 
+.av-table td:last-child {
+    /* Put all of the spare width in this column. */
+    width: 100%;
+}
+
 .av-table td {
     padding-left: 0.5rem;
     padding-right: 0.5rem;

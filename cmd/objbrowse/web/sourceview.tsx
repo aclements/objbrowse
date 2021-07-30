@@ -23,6 +23,7 @@ function SourceViewer(props: ViewProps) {
     }
     const v: json = fetch.value;
 
+    // Create a table for each source block.
     let blocks = v.Blocks.map((val, blockI) => {
         return <Block key={blockI} block={val} {...props} />;
     });

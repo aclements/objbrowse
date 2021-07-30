@@ -6,7 +6,13 @@
 
 .sv-table {
     min-width: 100%;
+    /* Put space between each source file's table */
     margin-bottom: 1rem;
+}
+
+.sv-table td:last-child {
+    /* Put all of the spare width in this column. */
+    width: 100%;
 }
 
  .sv-table td {
