@@ -104,6 +104,8 @@ function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, selfID: num
             const range = selfRange || { start: addr, end: addr + BigInt(1) };
             onSelect({ entity, ranges: new Ranges([range]) });
             ev.preventDefault();
+            // Prevent the row click, which will try to select the row.
+            ev.stopPropagation();
         }}>{text}</a>);
         start = re.lastIndex;
     }

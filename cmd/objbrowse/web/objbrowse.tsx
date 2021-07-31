@@ -41,11 +41,13 @@ export function App(props: AppProps) {
     // TODO: Sync current entity (and selected range in that entity) to
     // the URL history.
     //
-    // BUG: Following a link from asmview doesn't recompute the valid
-    // views because it calls setSelected directly rather than setEntity.
+    // TODO: Changing just the range in the current entity forces a
+    // re-render all the way up here. I could track the range in the
+    // EntityPanel, but I want to be able to jump to a range in a
+    // different entity, too. Maybe I should React.memo the SymPanel and
+    // move the valid views computation to EntityPanel (and maybe add
+    // some memoization to it, too).
     const [selected, setSelected] = useState<Selection | undefined>(undefined);
-    const [validViews, setValidViews] = useState<View[]>([]);
-    const [view, setView] = useState("");
 
     // Get object index.
     const indexJSON = useFetchJSON("/index");
@@ -66,38 +68,39 @@ export function App(props: AppProps) {
         }
     }
 
+    // Compute the valid views for the selection.
+    let validViews: View[] = [];
+    if (selected !== undefined) {
+        const viewSet = index.Syms.Views[selected.entity.id];
+        for (let i = 0; i < views.length; i++) {
+            if (views[i] && (viewSet & (1 << i))) {
+                validViews.push(views[i]);
+            }
+        }
+    }
+
     const setEntity = (entity?: Entity) => {
-        let validViews: View[] = [];
         if (entity === undefined) {
             setSelected(undefined);
         } else {
             setSelected({ entity, ranges: new Ranges() });
-            // Get valid views for this symbol.
-            const viewSet = index.Syms.Views[entity.id];
-            for (let i = 0; i < views.length; i++) {
-                if (views[i] && (viewSet & (1 << i))) {
-                    validViews.push(views[i]);
-                }
-            }
-        }
-        setValidViews(validViews);
-        if (validViews.length > 0) {
-            setView(validViews[0].id);
-        } else {
-            setView("");
         }
     }
 
+    // The EntityPanel is keyed on the selected entity. This causes
+    // React to rebuild the whole EntityPanel when the entity changes.
+    // This makes sense because there's not much that makes sense to
+    // reuse, and it re-evaluates the best valid view to show.
     return (
         <div className="ob-root">
             <div className="container-fluid">
                 <div className="row flex-xl-nowrap">
                     <div className="col-2 p-0">
-                        <SymPanel index={index} entity={selected?.entity} onSelect={setEntity} />
+                        <SymPanel index={index} entity={selected?.entity} onSelectEntity={setEntity} />
                     </div>
                     {selected !== undefined &&
                         <div className="col-10 p-0">
-                            <EntityPanel views={validViews} viewID={view} onSelectView={setView} value={selected} onSelect={setSelected} />
+                            <EntityPanel key={entityKey(selected.entity)} views={validViews} value={selected} onSelect={setSelected} />
                         </div>
                     }
                 </div>
@@ -109,7 +112,7 @@ export function App(props: AppProps) {
 interface SymPanelProps {
     index: indexJSON,
     entity?: Entity;
-    onSelect: (ent?: Entity) => void;
+    onSelectEntity: (ent?: Entity) => void;
 }
 
 function SymPanel(props: SymPanelProps) {
@@ -142,7 +145,7 @@ function SymPanel(props: SymPanelProps) {
             // Don't add left or right margin. The SymList rows add their own.
         }
         <div className="my-3">
-            <SymList index={props.index} filter={filter} entity={props.entity} onSelect={props.onSelect} />
+            <SymList index={props.index} filter={filter} entity={props.entity} onSelect={props.onSelectEntity} />
         </div>
     </div >);
 }
@@ -184,13 +187,13 @@ function SymList(props: SymListProps) {
 
 interface EntityPanelProps {
     views: View[];
-    viewID: string;
-    onSelectView: (view: string) => void;
     value: Selection;
     onSelect: (sel: Selection) => void;
 }
 
 function EntityPanel(props: EntityPanelProps) {
+    const [viewID, setViewID] = useState(props.views[0].id);
+
     const onSelectRange = (range: Ranges) => {
         props.onSelect({ entity: props.value.entity, ranges: range });
     }
@@ -200,20 +203,17 @@ function EntityPanel(props: EntityPanelProps) {
             {/* padding-left extends the bottom border to the left */}
             {/* padding-top keeps it in place when scrolling */}
             <nav className="nav nav-tabs ps-3 pt-3">
-                {props.views.map((View) =>
-                    View.id == props.viewID ?
-                        <span key={View.id} className="nav-link active" aria-current="page">{View.label}</span> :
-                        <span key={View.id} className="nav-link" onClick={() => props.onSelectView(View.id)}>{View.label}</span>
+                {props.views.map((view) =>
+                    view.id === viewID ?
+                        <span key={view.id} className="nav-link active" aria-current="page">{view.label}</span> :
+                        <span key={view.id} className="nav-link" onClick={() => setViewID(view.id)}>{view.label}</span>
                 )}
             </nav>
             {/* The outer div fills the space */}
             <div>
                 {props.views.map((view) =>
-                    // We make the entity key part of the view key so
-                    // the element gets completely reset when the entity
-                    // changes.
-                    <EntityView key={`${view.id} ${entityKey(props.value.entity)}`}
-                        view={view} current={view.id == props.viewID} value={props.value}
+                    <EntityView key={view.id}
+                        view={view} current={view.id == viewID} value={props.value}
                         onSelect={props.onSelect} onSelectRange={onSelectRange} />
                 )}
             </div>
