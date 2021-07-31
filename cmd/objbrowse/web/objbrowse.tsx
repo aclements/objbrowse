@@ -9,7 +9,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./objbrowse.css";
 
 import { useFetchJSON } from "./hooks";
-import { Ranges } from "./ranges";
+import { Ranges, Range } from "./ranges";
 
 export type Entity = { type: "sym", id: number }
 
@@ -18,6 +18,37 @@ function entityKey(ent: Entity): string {
 }
 
 export type Selection = { entity: Entity, ranges: Ranges }
+
+function selectionToHash(s: Selection | undefined): string {
+    if (s === undefined) {
+        return "";
+    }
+    let str = `#${s.entity.type}/${s.entity.id}`;
+    s.ranges.ranges.forEach((r, i) => {
+        str += i == 0 ? "@" : ",";
+        str += `${r.start.toString(16)}-${r.end.toString(16)}`;
+    });
+    return str;
+}
+
+function hashToSelection(str: string): Selection | undefined {
+    const m = /^#sym[/]([0-9]+)(?:@(.*))?$/.exec(str);
+    if (m === null) {
+        return undefined;
+    }
+    const entity: Entity = { type: "sym", id: parseInt(m[1]) };
+    let ranges: Range[] = [];
+    if (m[2] !== undefined) {
+        for (let r of m[2].split(",")) {
+            const rm = /^([0-9a-f]+)-([0-9a-f]+)$/i.exec(r);
+            if (rm === null) {
+                return undefined;
+            }
+            ranges.push({ start: BigInt("0x" + rm[1]), end: BigInt("0x" + rm[2]) });
+        }
+    }
+    return { entity: entity, ranges: new Ranges(ranges) };
+}
 
 export interface ViewProps {
     value: Selection;
@@ -38,8 +69,6 @@ type indexJSON = {
 }
 
 export function App(props: AppProps) {
-    // TODO: Sync current entity (and selected range in that entity) to
-    // the URL history.
     const [selected, setSelected] = useState<Selection | undefined>(undefined);
 
     const setEntity = useCallback((entity?: Entity) => {
@@ -49,6 +78,41 @@ export function App(props: AppProps) {
             setSelected({ entity, ranges: new Ranges() });
         }
     }, [setSelected]);
+
+    // Save state in history.
+    //
+    // TODO: I put the state in a hash string so its user-visible, but
+    // the entity IDs aren't exactly meaningful and the ranges probably
+    // aren't super useful. Maybe I should just use state objects. The
+    // hash would be much more useful if it had the symbol name, but
+    // that may not be unique. Maybe I want some sort of semi-stable ID
+    // -> unique symbol name mapping, like adding numbers to
+    // disambiguate.
+    //
+    // TODO: We capture the most important stuff in the hash, but
+    // there's other state that would be nice to track in the state
+    // object, like which view is selected and maybe the search filter.
+    useEffect(() => {
+        const popstate = () => {
+            if (window.location.hash === "") {
+                setSelected(undefined);
+                return;
+            }
+            const sel = hashToSelection(window.location.hash);
+            // If we can't parse it, just ignore.
+            if (sel === undefined) {
+                return;
+            }
+            setSelected(sel);
+        };
+        window.addEventListener('popstate', popstate);
+        popstate();
+        return () => { window.removeEventListener('popstate', popstate) };
+    }, []);
+    const hash = selectionToHash(selected);
+    if (window.location.hash !== hash) {
+        history.pushState(null, document.title, hash);
+    }
 
     // Get object index.
     const indexJSON = useFetchJSON("/index");
