@@ -67,7 +67,7 @@ function AsmViewer(props: ViewProps) {
                 <td className="av-addr">0x{inst.PC}</td>
                 <td className="av-addr">+0x{(pcs[i] - pcs[0]).toString(16)}</td>
                 <td className="av-inst">{inst.Op}</td>
-                <td className="av-inst">{formatArgs(inst.Args, v.Refs, rangeMap, props.value.entity.id, props.onSelect)}</td>
+                <td className="av-inst">{formatArgs(inst.Args, v.Refs, rangeMap, props.value.entity, props.onSelect)}</td>
             </tr >
         );
     }
@@ -75,7 +75,7 @@ function AsmViewer(props: ViewProps) {
     return <table className="av-table"><tbody>{rows}</tbody></table>;
 }
 
-function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, selfID: number, onSelect: (sel: Selection) => void): React.ReactElement {
+function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, self: Entity, onSelect: (sel: Selection) => void): React.ReactElement {
     if (!args.includes("\u00ab")) {
         // No symbolic references.
         return <>{args}</>;
@@ -96,13 +96,22 @@ function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, selfID: num
             text += `+0x${offset.toString(16)}`;
         }
         parts.push(<a key={start} href="#" onClick={(ev) => {
-            const entity: Entity = { type: "sym", id: sym.ID };
             const addr = BigInt("0x" + sym.Addr) + BigInt(offset);
-            // If this is a reference to our own symbol, find the range
-            // containing offset so we can select the whole instruction.
-            const selfRange = sym.ID == selfID ? ranges.find(addr) : null;
-            const range = selfRange || { start: addr, end: addr + BigInt(1) };
-            onSelect({ entity, ranges: new Ranges([range]) });
+            let range = { start: addr, end: addr + BigInt(1) };
+            let entity: Entity;
+            if (sym.ID == self.id) {
+                // This is a reference to our own symbol. Find the range
+                // containing offset so we can select the whole
+                // instruction.
+                //
+                // Use the self object itself (rather than making a new
+                // entity) to reduce re-rendering.
+                entity = self;
+                range = ranges.find(addr) || range;
+            } else {
+                entity = { type: "sym", id: sym.ID };
+            }
+            onSelect({ entity, ranges: new Ranges(range) });
             ev.preventDefault();
             // Prevent the row click, which will try to select the row.
             ev.stopPropagation();

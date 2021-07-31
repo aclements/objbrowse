@@ -4,7 +4,7 @@
  * license that can be found in the LICENSE file.
  */
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./objbrowse.css";
 
@@ -40,14 +40,15 @@ type indexJSON = {
 export function App(props: AppProps) {
     // TODO: Sync current entity (and selected range in that entity) to
     // the URL history.
-    //
-    // TODO: Changing just the range in the current entity forces a
-    // re-render all the way up here. I could track the range in the
-    // EntityPanel, but I want to be able to jump to a range in a
-    // different entity, too. Maybe I should React.memo the SymPanel and
-    // move the valid views computation to EntityPanel (and maybe add
-    // some memoization to it, too).
     const [selected, setSelected] = useState<Selection | undefined>(undefined);
+
+    const setEntity = useCallback((entity?: Entity) => {
+        if (entity === undefined) {
+            setSelected(undefined);
+        } else {
+            setSelected({ entity, ranges: new Ranges() });
+        }
+    }, [setSelected]);
 
     // Get object index.
     const indexJSON = useFetchJSON("/index");
@@ -59,6 +60,11 @@ export function App(props: AppProps) {
     const index: indexJSON = indexJSON.value;
 
     // Map our views name to the server view indexes.
+    //
+    // TODO: Memoize this? Even changing the selected range re-renders
+    // App. Tricky because of the indexJSON.pending branch. We could
+    // move this between the useFetchJSON and the pending check, or make
+    // a component that lives below App.
     let viewMap = new Map(props.views.map(view => [view.id, view]));
     let views: View[] = []; // By server index.
     for (let i = 0; i < index.Views.length; i++) {
@@ -76,14 +82,6 @@ export function App(props: AppProps) {
             if (views[i] && (viewSet & (1 << i))) {
                 validViews.push(views[i]);
             }
-        }
-    }
-
-    const setEntity = (entity?: Entity) => {
-        if (entity === undefined) {
-            setSelected(undefined);
-        } else {
-            setSelected({ entity, ranges: new Ranges() });
         }
     }
 
@@ -194,9 +192,9 @@ interface EntityPanelProps {
 function EntityPanel(props: EntityPanelProps) {
     const [viewID, setViewID] = useState(props.views[0].id);
 
-    const onSelectRange = (range: Ranges) => {
+    const onSelectRange = useCallback((range: Ranges) => {
         props.onSelect({ entity: props.value.entity, ranges: range });
-    }
+    }, [props.onSelect]);
 
     return (
         <div className="ob-entity-panel">
