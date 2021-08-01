@@ -344,11 +344,13 @@ function scrollToAll(parent: Element, list: NodeListOf<Element>) {
     if (parentRect.top <= listTop && listTop < parentRect.bottom) {
         return;
     }
-    // Center list.
-    let target = listTop - (parentRect.top + parentRect.height / 2) + (listBot - listTop) / 2;
+    // Center list. Remember that listTop/listBot are relative to the
+    // screen and thus relative to parent's current scroll offset, but
+    // we need to compute a new absolute scroll offset.
+    let target = parent.scrollTop + listTop - (parentRect.top + parentRect.height / 2) + (listBot - listTop) / 2;
     // Unless that would scroll the top of list out of view.
-    const margin = 10;
-    target = Math.max(target, margin);
-
+    const margin = 16;
+    let limit = parent.scrollTop + listTop - (parentRect.top + margin);
+    target = Math.min(target, limit);
     parent.scrollTo({ top: target, behavior: "smooth" });
 }
