@@ -161,7 +161,7 @@ export function App(props: AppProps) {
                         <SymPanel index={index} entity={selected?.entity} onSelectEntity={setEntity} />
                     </div>
                     {selected !== undefined &&
-                        <div className="col-10 p-0">
+                        <div className="col-10 p-0 ob-entity-container">
                             <EntityPanel key={entityKey(selected.entity)} views={validViews} value={selected} onSelect={setSelected} />
                         </div>
                     }
@@ -253,7 +253,45 @@ interface EntityPanelProps {
     onSelect: (sel: Selection) => void;
 }
 
+type EntityPanelAction = { type: "add" } | { type: "close", id: number }
+
+// TODO: Navigating to another entity and then hitting "back" should
+// restore the view state, including the number of columns and each
+// column's selected view.
+
+/**
+ * EntityPanel displays the selected entity as one or more
+ * EntityColumns.
+ */
 function EntityPanel(props: EntityPanelProps) {
+    type state = { id: number, panels: number[] };
+    const [state, dispatch] = React.useReducer(
+        (old: state, action: EntityPanelAction) => {
+            if (action.type === "add") {
+                return { id: old.id + 1, panels: [...old.panels, old.id + 1] };
+            } else {
+                return { id: old.id, panels: old.panels.filter(id => id != action.id) };
+            }
+        },
+        { id: 1, panels: [0] });
+
+    const panels = state.panels;
+    return (<>
+        {panels.map((id, idx) => <EntityColumn key={id} {...props} update={dispatch} id={id} many={panels.length > 1} last={idx == panels.length - 1} />)}
+    </>);
+}
+
+interface EntityColumnProps extends EntityPanelProps {
+    update: (action: EntityPanelAction) => void;
+    id: number;
+    many: boolean;
+    last: boolean;
+}
+
+/**
+ * EntityColumn displays the set of valid views for the current entity.
+ */
+function EntityColumn(props: EntityColumnProps) {
     const [viewID, setViewID] = useState(props.views[0].id);
 
     const onSelectRange = useCallback((range: Ranges) => {
@@ -270,6 +308,10 @@ function EntityPanel(props: EntityPanelProps) {
                         <span key={view.id} className="nav-link active" aria-current="page">{view.label}</span> :
                         <span key={view.id} className="nav-link" onClick={() => setViewID(view.id)}>{view.label}</span>
                 )}
+                <span className="ob-entity-panel-buttons">
+                    {props.many && <EntityNavButton type="close" title="Close column" onClick={() => props.update({ type: "close", id: props.id })} />}
+                    {props.last && <EntityNavButton type="add" title="New column" onClick={() => props.update({ type: "add" })} />}
+                </span>
             </nav>
             {/* The outer div fills the space */}
             <div>
@@ -283,11 +325,28 @@ function EntityPanel(props: EntityPanelProps) {
     );
 }
 
+function EntityNavButton(props: { type: "close" | "add", title?: string, onClick: () => void }) {
+    let path;
+    // For the paths, use a viewbox a little smaller than 0,0 10x10. The
+    // actual viewbox is bigger so we can highlight on hover.
+    if (props.type === "close") {
+        path = <path d="M 2 2L8 8M2 8L8 2" stroke="#495057" strokeWidth="1.2" />;
+    } else {
+        path = <path d="M1 1V9H9V1ZM5 1V9" stroke="#495057" fill="none" />;
+    }
+    let svg = <svg width="1.6rem" height="1.6rem" viewBox="-3 -3 16 16" onClick={props.onClick}>{path}</svg>
+    return <span role="button" className="ob-entity-nav-button" title={props.title}>{svg}</span>;
+}
+
 interface EntityViewProps extends ViewProps {
     view: View;
     current: boolean;
 }
 
+/**
+ * EntityView displays a single view of an entity. It implements common
+ * functionality across all views, including scrolling to the selection.
+ */
 function EntityView(props: EntityViewProps) {
     const domRef = useRef<HTMLDivElement>(null);
     useEffect(() => {

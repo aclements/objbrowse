@@ -72,14 +72,40 @@
     color: white;
 }
 
+.ob-entity-container {
+    display: flex;
+}
+
 .ob-entity-panel {
+    flex-grow: 1; /* Fill ob-entity-container */
     height: 100vh;
     display: flex;
     flex-flow: column;
 }
 
+.ob-entity-panel + .ob-entity-panel {
+    border-left: 1px solid #ccc;
+}
+
 .ob-entity-panel > nav {
     flex: 0 1 auto;
+}
+
+.ob-entity-panel > nav .nav-link {
+    cursor: pointer;
+}
+
+.ob-entity-panel-buttons {
+    flex-grow: 1; /* Fill the remaining nav space */
+    padding-right: 1rem; /* Match nav-link right padding */
+    display: flex;
+    justify-content: flex-end; /* Move buttons to the right */
+    align-items: center; /* Center buttons vertically */
+}
+
+.ob-entity-nav-button > svg:hover {
+    background: rgba(127,127,127,0.5);
+    border-radius: 1rem;
     cursor: pointer;
 }
 
