@@ -18,6 +18,10 @@
     padding-right: 0.5rem;
 }
 
+tr.av-unconditional {
+    height: 1rem;
+}
+
 .av-addr {
     font-family: var(--bs-font-monospace);
     color: var(--ob-addr-color);

@@ -9,13 +9,13 @@ export type Range = { start: bigint, end: bigint }
 /**
  * Ranges is a set of intervals.
  */
-export class Ranges {
-    ranges: Range[];
+export class Ranges<R extends Range = Range> {
+    ranges: R[];
 
     // ranges must be an array of objects with "start" and "end"
     // properties, where each object covers a disjoint range [start,
     // end).
-    constructor(ranges?: Range | Range[] | Ranges, sorted?: "sorted") {
+    constructor(ranges?: R | R[] | Ranges<R>, sorted?: "sorted") {
         if (ranges === undefined) {
             this.ranges = [];
             return;
@@ -64,7 +64,7 @@ export class Ranges {
     /**
      * find returns the range containing point, or null.
      */
-    find(point: bigint): Range | null {
+    find(point: bigint): R | null {
         const i = this.index(point);
         if (i < this.ranges.length && contains(this.ranges[i], point)) {
             return this.ranges[i];

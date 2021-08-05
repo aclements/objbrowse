@@ -58,9 +58,9 @@ type instJSON struct {
 }
 
 type controlJSON struct {
-	Type        asm.ControlType
+	Type        string
 	Conditional bool
-	TargetPC    AddrJS
+	TargetPC    AddrJS `json:",omitempty"`
 }
 
 type symRefJSON struct {
@@ -136,7 +136,7 @@ func (v *AsmView) View(entity interface{}) http.HandlerFunc {
 			if control.Type != asm.ControlNone {
 				disasm.Control = &disasm.controlStore
 				disasm.controlStore = controlJSON{
-					Type:        control.Type,
+					Type:        control.Type.String()[len("Control"):],
 					Conditional: control.Conditional,
 					TargetPC:    AddrJS(control.TargetPC),
 				}

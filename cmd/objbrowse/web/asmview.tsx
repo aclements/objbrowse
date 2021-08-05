@@ -4,7 +4,7 @@
  * license that can be found in the LICENSE file.
  */
 
-import React from "react";
+import React, { useState, useRef, useCallback } from "react";
 
 import { ViewProps, Entity, Selection } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
@@ -16,19 +16,12 @@ import "./asmview.css";
 type json = { Insts: inst[], Refs: symRef[], LastPC: string }
 type inst = { PC: string, Op: string, Args: string, Control?: control }
 type symRef = { ID: number, Name: string, Addr: string }
-type control = { Type: number, Conditional: boolean, TargetPC: string }
-
-// TODO: Implement selecting an instruction or range of instructions.
-
-// TODO: Display control flow. Showing all of the arrows is a little
-// overwhelming. Maybe I should just show outgoing/incoming arrows for
-// the selected (moused-over if no selection) instruction? Doing just
-// mouse-over doesn't help for viewing long jumps. Maybe I always mark
-// instructions that are the target of a jump, just not with the whole
-// arrow.
+type control = { Type: string, Conditional: boolean, TargetPC?: string }
 
 // TODO: Display source lines for each instruction, including their
-// inline info (on hover or something).
+// inline info (on hover or something). If there's inlining, showing the
+// innermost function name of each instruction may be particularly
+// valuable.
 
 function AsmViewer(props: ViewProps) {
     // Fetch data.
@@ -37,40 +30,127 @@ function AsmViewer(props: ViewProps) {
         return fetch.pending;
     }
     const v: json = fetch.value;
+    return <AsmViewer1 {...props} v={v} />;
+}
 
-    // Parse PCs and compute lengths of all instructions.
+interface AsmViewer1Props extends ViewProps {
+    v: json;
+}
+
+function AsmViewer1(props: AsmViewer1Props) {
+    console.log("render AsmViewer1");
+    const v = props.v;
+
+    // TODO: Memoize parsing v.
+
+    // Parse PCs.
     let pcs: bigint[] = [];
-    let ranges: Range[] = [];
-    for (let i = 0; i < v.Insts.length; i++) {
-        pcs.push(BigInt("0x" + v.Insts[i].PC));
+    for (let inst of v.Insts) {
+        pcs.push(BigInt("0x" + inst.PC));
     }
+    // Compute ranges for each instruction.
+    let ranges = [];
     pcs.push(BigInt("0x" + v.LastPC));
     for (let i = 0; i < v.Insts.length; i++) {
-        ranges.push({ start: pcs[i], end: pcs[i + 1] });
+        ranges.push({ start: pcs[i], end: pcs[i + 1], index: i });
     }
-    // Ranges will sort this by start, but that's okay because it's
-    // already sorted by start.
-    let rangeMap = new Ranges(ranges);
+    let rangeMap = new Ranges(ranges, "sorted");
+    // Invert control flow.
+    let sources = new Array<number[]>(v.Insts.length);
+    for (let [source, inst] of v.Insts.entries()) {
+        if (inst.Control?.TargetPC !== undefined) {
+            let target = BigInt("0x" + inst.Control.TargetPC);
+            let i = rangeMap.find(target)?.index;
+            if (i !== undefined) {
+                if (sources[i] === undefined) {
+                    sources[i] = [];
+                }
+                sources[i].push(source);
+            }
+        }
+    }
 
     // Create the instruction rows.
-    const rows: React.ReactElement[] = [];
+    let rows: React.ReactElement[] = [];
+    // We use rowRefs to measure the DOM and create new DOM. This
+    // circular dependency is tricky. If, while creating new DOM, we
+    // find that we're missing refs, we set refsStale. Then, if a ref
+    // gets updated, it will bump refGen to force a re-render.
+    let rowRefs = useRef<(HTMLTableRowElement | undefined)[]>([]); // By instruction index.
+    let refsStale = false;
+    let [_, setRefGen] = useState(0);
     for (let i = 0; i < v.Insts.length; i++) {
         const inst = v.Insts[i];
         const range = ranges[i];
 
-        let className = "";
-        if (props.value.ranges.anyIntersection(range)) {
-            className = "ob-selected";
+        let selected = props.value.ranges.anyIntersection(range);
+        let className = selected ? "ob-selected" : "";
+
+        let target;
+        if (sources[i] !== undefined) {
+            let sourceLine;
+            let sourceMarks = [];
+            if (selected) {
+                let mr = rowRefs.current[i];
+                if (mr === undefined) {
+                    refsStale = true;
+                } else {
+                    let my = mr.getBoundingClientRect().y;
+                    let min = my, max = my;
+                    for (let j of sources[i]) {
+                        let tr = rowRefs.current[j];
+                        if (tr === undefined) {
+                            refsStale = true;
+                            continue;
+                        }
+                        let ty = tr.getBoundingClientRect().y;
+                        if (ty < min) {
+                            min = ty;
+                        }
+                        if (ty > max) {
+                            max = ty;
+                        }
+                        // Add a mark for this source.
+                        sourceMarks.push(<circle key={j} cx="0" cy={ty - my} r="5" />);
+                    }
+                    // Create a single line from the highest to lowest source.
+                    sourceLine = <path d={`M0 ${min - my}V${max - my}`} stroke="black" strokeWidth="2px" />;
+                }
+            }
+
+            target = <svg style={{ overflow: "visible", width: "16px", height: "1px" }}>
+                <path d={`M${selected ? 0 : 8} 0H15`} stroke="black" strokeWidth="2px" />
+                <path d="M16 0l-5 -3v6z" /> {/* Arrow head */}
+                {sourceLine}
+                {sourceMarks}
+            </svg>
         }
 
         rows.push(
-            <tr key={i} className={className} onClick={() => props.onSelectRange(new Ranges(range))}>
+            <tr key={i} className={className} data-i={i} onClick={() => props.onSelectRange(new Ranges(range))}
+                ref={elt => {
+                    if (elt === null) {
+                        rowRefs.current[i] = undefined;
+                    } else {
+                        if (rowRefs.current[i] === undefined && refsStale) {
+                            // Force a re-render.
+                            setRefGen(gen => gen + 1);
+                        }
+                        rowRefs.current[i] = elt;
+                    }
+                }}>
                 <td className="av-addr">0x{inst.PC}</td>
                 <td className="av-addr">+0x{(pcs[i] - pcs[0]).toString(16)}</td>
+                <td>{target}</td>
                 <td className="av-inst">{inst.Op}</td>
                 <td className="av-inst">{formatArgs(inst.Args, v.Refs, rangeMap, props.value.entity, props.onSelect)}</td>
             </tr >
         );
+
+        // If this is an unconditional flow exit, leave a blank.
+        if (inst.Control?.Conditional === false && (inst.Control.Type == "Jump" || inst.Control.Type == "Ret" || inst.Control.Type == "Exit")) {
+            rows.push(<tr key={i + "x"} className="av-unconditional" />)
+        }
     }
 
     return <table className="av-table"><tbody>{rows}</tbody></table>;
