@@ -9,6 +9,7 @@ import React from "react";
 import { ViewProps, Entity, Selection } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
 import { Ranges, Range } from "./ranges";
+import * as History from "./history";
 
 import "./asmview.css";
 
@@ -75,7 +76,7 @@ function AsmViewer(props: ViewProps) {
     return <table className="av-table"><tbody>{rows}</tbody></table>;
 }
 
-function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, self: Entity, onSelect: (sel: Selection) => void): React.ReactElement {
+function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, self: Entity, onSelect: (sel: Selection, push?: History.PushKind) => void): React.ReactElement {
     if (!args.includes("\u00ab")) {
         // No symbolic references.
         return <>{args}</>;
@@ -111,7 +112,7 @@ function formatArgs(args: string, symRefs: symRef[], ranges: Ranges, self: Entit
             } else {
                 entity = { type: "sym", id: sym.ID };
             }
-            onSelect({ entity, ranges: new Ranges(range) });
+            onSelect({ entity, ranges: new Ranges(range) }, "push");
             ev.preventDefault();
             // Prevent the row click, which will try to select the row.
             ev.stopPropagation();

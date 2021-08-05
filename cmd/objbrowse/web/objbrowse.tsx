@@ -10,6 +10,7 @@ import "./objbrowse.css";
 
 import { useFetchJSON } from "./hooks";
 import { Ranges, Range } from "./ranges";
+import * as History from "./history";
 
 export type Entity = { type: "sym", id: number }
 
@@ -19,11 +20,11 @@ function entityKey(ent: Entity): string {
 
 export type Selection = { entity: Entity, ranges: Ranges }
 
-function selectionToHash(s: Selection | undefined): string {
+function selectionToString(s: Selection | undefined): string {
     if (s === undefined) {
         return "";
     }
-    let str = `#${s.entity.type}/${s.entity.id}`;
+    let str = `${s.entity.type}/${s.entity.id}`;
     s.ranges.ranges.forEach((r, i) => {
         str += i == 0 ? "@" : ",";
         str += `${r.start.toString(16)}-${r.end.toString(16)}`;
@@ -31,8 +32,8 @@ function selectionToHash(s: Selection | undefined): string {
     return str;
 }
 
-function hashToSelection(str: string): Selection | undefined {
-    const m = /^#sym[/]([0-9]+)(?:@(.*))?$/.exec(str);
+function selectionFromString(str: string): Selection | undefined {
+    const m = /^sym[/]([0-9]+)(?:@(.*))?$/.exec(str);
     if (m === null) {
         return undefined;
     }
@@ -52,7 +53,7 @@ function hashToSelection(str: string): Selection | undefined {
 
 export interface ViewProps {
     value: Selection;
-    onSelect: (ent: Selection) => void;
+    onSelect: (ent: Selection, push?: History.PushKind) => void;
     onSelectRange: (range: Ranges) => void;
 }
 export interface View {
@@ -61,7 +62,10 @@ export interface View {
     label: string;
 }
 
-export interface AppProps { views: View[] }
+export interface AppProps {
+    views: View[];
+    history: History.Key;
+}
 
 type indexJSON = {
     Views: string[];
@@ -69,50 +73,16 @@ type indexJSON = {
 }
 
 export function App(props: AppProps) {
-    const [selected, setSelected] = useState<Selection | undefined>(undefined);
+    const [selected, setSelected] = History.useState<Selection | undefined>(props.history, undefined, selectionToString, selectionFromString);
 
     const setEntity = useCallback((entity?: Entity) => {
+        // Changing the whole entity always pushes a new history record.
         if (entity === undefined) {
-            setSelected(undefined);
+            setSelected(undefined, "push");
         } else {
-            setSelected({ entity, ranges: new Ranges() });
+            setSelected({ entity, ranges: new Ranges() }, "push");
         }
     }, [setSelected]);
-
-    // Save state in history.
-    //
-    // TODO: I put the state in a hash string so its user-visible, but
-    // the entity IDs aren't exactly meaningful and the ranges probably
-    // aren't super useful. Maybe I should just use state objects. The
-    // hash would be much more useful if it had the symbol name, but
-    // that may not be unique. Maybe I want some sort of semi-stable ID
-    // -> unique symbol name mapping, like adding numbers to
-    // disambiguate.
-    //
-    // TODO: We capture the most important stuff in the hash, but
-    // there's other state that would be nice to track in the state
-    // object, like which view is selected and maybe the search filter.
-    useEffect(() => {
-        const popstate = () => {
-            if (window.location.hash === "") {
-                setSelected(undefined);
-                return;
-            }
-            const sel = hashToSelection(window.location.hash);
-            // If we can't parse it, just ignore.
-            if (sel === undefined) {
-                return;
-            }
-            setSelected(sel);
-        };
-        window.addEventListener('popstate', popstate);
-        popstate();
-        return () => { window.removeEventListener('popstate', popstate) };
-    }, []);
-    const hash = selectionToHash(selected);
-    if (window.location.hash !== hash) {
-        history.pushState(null, document.title, hash);
-    }
 
     // Get object index.
     const indexJSON = useFetchJSON("/index");
@@ -162,7 +132,8 @@ export function App(props: AppProps) {
                     </div>
                     {selected !== undefined &&
                         <div className="col-10 p-0 ob-entity-container">
-                            <EntityPanel key={entityKey(selected.entity)} views={validViews} value={selected} onSelect={setSelected} />
+                            <EntityPanel key={entityKey(selected.entity)} history={props.history.sub(entityKey(selected.entity))}
+                                views={validViews} value={selected} onSelect={setSelected} />
                         </div>
                     }
                 </div>
@@ -250,14 +221,11 @@ function SymList(props: SymListProps) {
 interface EntityPanelProps {
     views: View[];
     value: Selection;
-    onSelect: (sel: Selection) => void;
+    onSelect: (sel: Selection, push?: History.PushKind) => void;
+    history: History.Key;
 }
 
-type EntityPanelAction = { type: "add" } | { type: "close", id: number }
-
-// TODO: Navigating to another entity and then hitting "back" should
-// restore the view state, including the number of columns and each
-// column's selected view.
+type EntityPanelAction = ["add"] | ["close", number]
 
 /**
  * EntityPanel displays the selected entity as one or more
@@ -265,19 +233,34 @@ type EntityPanelAction = { type: "add" } | { type: "close", id: number }
  */
 function EntityPanel(props: EntityPanelProps) {
     type state = { id: number, panels: number[] };
-    const [state, dispatch] = React.useReducer(
+    const decodeState = (x: any): state | undefined => {
+        if (typeof x !== "string") {
+            return undefined;
+        }
+        let panels = x.split(" ").map(v => parseInt(v));
+        if (panels.some(v => isNaN(v))) {
+            return undefined;
+        }
+        return { id: Math.max(...panels) + 1, panels };
+    }
+    const [state, dispatch] = History.useReducer(props.history,
         (old: state, action: EntityPanelAction) => {
-            if (action.type === "add") {
-                return { id: old.id + 1, panels: [...old.panels, old.id + 1] };
-            } else {
-                return { id: old.id, panels: old.panels.filter(id => id != action.id) };
+            switch (action[0]) {
+                case "add":
+                    return { id: old.id + 1, panels: [...old.panels, old.id] };
+                case "close":
+                    return { id: old.id, panels: old.panels.filter(id => id != action[1]) };
             }
         },
-        { id: 1, panels: [0] });
+        { id: 1, panels: [0] },
+        v => v.panels.join(" "),
+        decodeState);
 
     const panels = state.panels;
     return (<>
-        {panels.map((id, idx) => <EntityColumn key={id} {...props} update={dispatch} id={id} many={panels.length > 1} last={idx == panels.length - 1} />)}
+        {panels.map((id, idx) =>
+            <EntityColumn key={id} {...props} history={props.history.sub(id.toString())}
+                update={dispatch} id={id} many={panels.length > 1} last={idx == panels.length - 1} />)}
     </>);
 }
 
@@ -292,7 +275,7 @@ interface EntityColumnProps extends EntityPanelProps {
  * EntityColumn displays the set of valid views for the current entity.
  */
 function EntityColumn(props: EntityColumnProps) {
-    const [viewID, setViewID] = useState(props.views[0].id);
+    const [viewID, setViewID] = History.useState(props.history, props.views[0].id, v => v, x => typeof x === "string" ? x : undefined);
 
     const onSelectRange = useCallback((range: Ranges) => {
         props.onSelect({ entity: props.value.entity, ranges: range });
@@ -309,8 +292,8 @@ function EntityColumn(props: EntityColumnProps) {
                         <span key={view.id} className="nav-link" onClick={() => setViewID(view.id)}>{view.label}</span>
                 )}
                 <span className="ob-entity-panel-buttons">
-                    {props.many && <EntityNavButton type="close" title="Close column" onClick={() => props.update({ type: "close", id: props.id })} />}
-                    {props.last && <EntityNavButton type="add" title="New column" onClick={() => props.update({ type: "add" })} />}
+                    {props.many && <EntityNavButton type="close" title="Close column" onClick={() => props.update(["close", props.id])} />}
+                    {props.last && <EntityNavButton type="add" title="New column" onClick={() => props.update(["add"])} />}
                 </span>
             </nav>
             {/* The outer div fills the space */}
