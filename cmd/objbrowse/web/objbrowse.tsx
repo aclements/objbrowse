@@ -190,7 +190,7 @@ interface SymListProps {
     onSelect: (ent?: Entity) => void;
 }
 
-function SymList(props: SymListProps) {
+const SymList = React.memo(function SymList(props: SymListProps) {
     // Scroll when the selected entity changes.
     const selectedElt = useRef<HTMLLIElement>(null);
     useEffect(() => {
@@ -216,7 +216,7 @@ function SymList(props: SymListProps) {
             })}
         </ul >
     );
-}
+});
 
 interface EntityPanelProps {
     views: View[];
@@ -274,7 +274,7 @@ interface EntityColumnProps extends EntityPanelProps {
 /**
  * EntityColumn displays the set of valid views for the current entity.
  */
-function EntityColumn(props: EntityColumnProps) {
+const EntityColumn = React.memo(function EntityColumn(props: EntityColumnProps) {
     const [viewID, setViewID] = History.useState(props.history, props.views[0].id, v => v, x => typeof x === "string" ? x : undefined);
 
     const onSelectRange = useCallback((range: Ranges) => {
@@ -306,7 +306,7 @@ function EntityColumn(props: EntityColumnProps) {
             </div>
         </div>
     );
-}
+});
 
 function EntityNavButton(props: { type: "close" | "add", title?: string, onClick: () => void }) {
     let path;

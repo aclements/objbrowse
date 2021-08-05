@@ -38,7 +38,6 @@ interface AsmViewer1Props extends ViewProps {
 }
 
 function AsmViewer1(props: AsmViewer1Props) {
-    console.log("render AsmViewer1");
     const v = props.v;
 
     // Parse PCs.
