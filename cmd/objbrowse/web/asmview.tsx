@@ -4,7 +4,7 @@
  * license that can be found in the LICENSE file.
  */
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useMemo } from "react";
 
 import { ViewProps, Entity, Selection } from "./objbrowse";
 import { useFetchJSON } from "./hooks";
@@ -41,34 +41,34 @@ function AsmViewer1(props: AsmViewer1Props) {
     console.log("render AsmViewer1");
     const v = props.v;
 
-    // TODO: Memoize parsing v.
-
     // Parse PCs.
-    let pcs: bigint[] = [];
-    for (let inst of v.Insts) {
-        pcs.push(BigInt("0x" + inst.PC));
-    }
+    let pcs = useMemo(() => {
+        let pcs = v.Insts.map(inst => BigInt("0x" + inst.PC));
+        pcs.push(BigInt("0x" + v.LastPC));
+        return pcs;
+    }, [v]);
     // Compute ranges for each instruction.
-    let ranges = [];
-    pcs.push(BigInt("0x" + v.LastPC));
-    for (let i = 0; i < v.Insts.length; i++) {
-        ranges.push({ start: pcs[i], end: pcs[i + 1], index: i });
-    }
-    let rangeMap = new Ranges(ranges, "sorted");
+    let [ranges, rangeMap] = useMemo(() => {
+        let ranges = pcs.map((pc, i) => ({ start: pc, end: pcs[i + 1], index: i }));
+        return [ranges, new Ranges(ranges, "sorted")];
+    }, [pcs]);
     // Invert control flow.
-    let sources = new Array<number[]>(v.Insts.length);
-    for (let [source, inst] of v.Insts.entries()) {
-        if (inst.Control?.TargetPC !== undefined) {
-            let target = BigInt("0x" + inst.Control.TargetPC);
-            let i = rangeMap.find(target)?.index;
-            if (i !== undefined) {
-                if (sources[i] === undefined) {
-                    sources[i] = [];
+    let sources = useMemo(() => {
+        let sources = new Array<number[]>(v.Insts.length);
+        for (let [source, inst] of v.Insts.entries()) {
+            if (inst.Control?.TargetPC !== undefined) {
+                let target = BigInt("0x" + inst.Control.TargetPC);
+                let i = rangeMap.find(target)?.index;
+                if (i !== undefined) {
+                    if (sources[i] === undefined) {
+                        sources[i] = [];
+                    }
+                    sources[i].push(source);
                 }
-                sources[i].push(source);
             }
         }
-    }
+        return sources;
+    }, [v, rangeMap]);
 
     // Create the instruction rows.
     let rows: React.ReactElement[] = [];
