@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/aclements/go-obj/dbg"
 	"github.com/aclements/go-obj/obj"
@@ -93,9 +94,15 @@ func (s *server) serve() error {
 
 type indexJSON struct {
 	Views []string
-	Syms  struct {
-		Names []string
-		Views []int // Bit mask over Views list
+	// We store the symbols as struct-of-arrays because it makes the
+	// JSON representation much smaller. The client side will transpose
+	// this back into objects.
+	Syms struct {
+		Names  []string
+		Values []AddrJS
+		Sizes  []uint64
+		Kinds  string // Indexed by sym ID
+		Views  []int  // Bit mask over Views list
 	}
 }
 
@@ -106,12 +113,18 @@ func (s *server) serveIndex(w http.ResponseWriter, req *http.Request) {
 		js.Views = append(js.Views, view.Name())
 	}
 
-	n := s.Obj.NumSyms()
-	js.Syms.Names = make([]string, 0, n)
-	js.Syms.Views = make([]int, 0, n)
-	for i := obj.SymID(0); i < n; i++ {
-		sym := s.Obj.Sym(i)
-		js.Syms.Names = append(js.Syms.Names, sym.Name)
+	syms := s.SymTab.Syms()
+	n := len(syms)
+	js.Syms.Names = make([]string, n)
+	js.Syms.Values = make([]AddrJS, n)
+	js.Syms.Sizes = make([]uint64, n)
+	var kinds strings.Builder
+	js.Syms.Views = make([]int, n)
+	for i, sym := range syms {
+		js.Syms.Names[i] = sym.Name
+		js.Syms.Values[i] = AddrJS(sym.Value)
+		js.Syms.Sizes[i] = sym.Size
+		kinds.WriteByte(byte(sym.Kind))
 
 		viewSet := 0
 		for viewI, view := range s.views {
@@ -119,8 +132,9 @@ func (s *server) serveIndex(w http.ResponseWriter, req *http.Request) {
 				viewSet |= 1 << viewI
 			}
 		}
-		js.Syms.Views = append(js.Syms.Views, viewSet)
+		js.Syms.Views[i] = viewSet
 	}
+	js.Syms.Kinds = kinds.String()
 
 	serveJSON(w, &js)
 }

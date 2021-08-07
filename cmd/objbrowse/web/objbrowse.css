@@ -29,6 +29,7 @@
     overflow-y: hidden;
 
     --ob-addr-color: #6c757d; /* .text-muted */
+    --ob-addr-inverted-color: #d0c8c1;
 }
 
 .ob-sympanel {
@@ -67,9 +68,17 @@
     background-color: rgba(127,127,127,0.5);
 }
 
+.ob-symlist-addr {
+    color: var(--ob-addr-color);
+}
+
 .ob-symlist-selected > div {
     background-color: var(--bs-primary) !important; /* Override :hover */
     color: white;
+}
+
+.ob-symlist-selected .ob-symlist-addr {
+    color: var(--ob-addr-inverted-color);
 }
 
 .ob-entity-container {
