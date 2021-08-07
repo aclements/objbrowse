@@ -109,7 +109,7 @@ func (v *AsmView) View(entity interface{}) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		var disasms []instJSON
+		disasms := []instJSON{}
 		for i := 0; i < insts.Len(); i++ {
 			inst := insts.Get(i)
 			// TODO: Often the address lookups are for type.*,
