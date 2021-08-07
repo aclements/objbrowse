@@ -181,9 +181,38 @@ interface SymPanelProps {
     onSelectEntity: (ent?: Entity) => void;
 }
 
+type SymFilter = (sym: Sym) => boolean;
+
 function SymPanel(props: SymPanelProps) {
+    const parseFilter = (str: string) => {
+        if (str === "") {
+            return (sym: Sym) => true;
+        }
+        // Try parsing as an address.
+        let addr: undefined | bigint;
+        if (/^0x[0-9a-fA-F]+$/.test(str)) {
+            addr = BigInt(str);
+        } else if (/^[0-9a-fA-F]+$/.test(str)) {
+            addr = BigInt("0x" + str);
+        }
+        // Try parsing as a regexp.
+        let regexp: undefined | RegExp;
+        try {
+            regexp = new RegExp(str);
+        } catch (e) { }
+        if (addr === undefined && regexp === undefined) {
+            return undefined;
+        }
+        return (sym: Sym) => {
+            return ((addr !== undefined && sym.value <= addr && addr - sym.value < sym.size) ||
+                (regexp !== undefined && regexp.test(sym.name)));
+        }
+    };
+
     const [filterStr, setFilterStr] = useState("");
-    const [filter, setFilter] = useState(() => new RegExp(filterStr));
+    // We box the filter function in a tuple because both useState and
+    // setX treat function arguments specially.
+    const [filter, setFilter] = useState<[SymFilter]>([(sym: Sym) => true]);
     const [isError, setError] = useState(false);
 
     // TODO: Updating the filter can be rather slow with a large symbol list.
@@ -192,33 +221,33 @@ function SymPanel(props: SymPanelProps) {
 
     function handleChange(val: string) {
         setFilterStr(val);
-        try {
-            setFilter(new RegExp(val));
-            setError(false);
-        } catch (e) {
+        let f = parseFilter(val);
+        if (f === undefined) {
             setError(true);
+        } else {
+            setFilter([f]);
+            setError(false);
         }
     }
 
-    // TODO: Filter by address.
     // TODO: Filter by symbol type?
 
     return (<div className="ob-sympanel bg-light">
         <div className="m-3">
-            <input value={filterStr} onChange={(ev) => handleChange(ev.target.value)} placeholder="Symbol regexp" className={isError ? "bg-warning" : ""}></input>
+            <input value={filterStr} onChange={(ev) => handleChange(ev.target.value)} placeholder="Name regexp or hex address" className={isError ? "bg-warning" : ""}></input>
         </div>
         {
             // Don't add left or right margin. The SymList rows add their own.
         }
         <div className="my-3">
-            <SymList syms={props.syms} filter={filter} entity={props.entity} onSelect={props.onSelectEntity} />
+            <SymList syms={props.syms} filter={filter[0]} entity={props.entity} onSelect={props.onSelectEntity} />
         </div>
     </div >);
 }
 
 interface SymListProps {
     syms: Sym[];
-    filter: RegExp;
+    filter: SymFilter;
     entity?: Entity;
     onSelect: (ent?: Entity) => void;
 }
@@ -239,7 +268,7 @@ const SymList = React.memo(function SymList(props: SymListProps) {
     return (
         <ul className="ob-symlist list-unstyled text-nowrap">
             {props.syms.map((sym, id) => {
-                if (props.filter.test(sym.name)) {
+                if (props.filter(sym)) {
                     let extra = null;
                     if (props.entity?.type == "sym" && props.entity.id == id) {
                         extra = { className: "ob-symlist-selected", ref: selectedElt };
