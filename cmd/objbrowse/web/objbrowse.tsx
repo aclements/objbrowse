@@ -254,26 +254,34 @@ interface SymListProps {
 
 const SymList = React.memo(function SymList(props: SymListProps) {
     // Scroll when the selected entity changes.
-    //
-    // TODO: Replace the ref with the CSS selector trick from EntityView.
-    const selectedElt = useRef<HTMLLIElement>(null);
+    const domRef = useRef<HTMLUListElement>(null);
     useEffect(() => {
-        if (selectedElt.current !== null) {
-            selectedElt.current.scrollIntoView({ block: "nearest" });
+        // Scroll the current selection into view.
+        const parent = domRef.current;
+        if (parent !== null) {
+            const selection = parent.querySelector(".ob-symlist-selected");
+            if (selection !== null) {
+                selection.scrollIntoView({ block: "nearest" });
+            }
         }
-    }, [props.entity]);
+    }, [domRef]);
 
     // TODO: Options to sort by name or address.
 
+    // Use a single, memoized onClick handler for all symbols.
+    const onClick = useCallback<React.MouseEventHandler<HTMLLIElement>>((ev) => {
+        let id = parseInt(ev.currentTarget.dataset.id || "");
+        props.onSelect({ type: "sym", id: id });
+    }, [props.onSelect]);
+
     return (
-        <ul className="ob-symlist list-unstyled text-nowrap">
+        <ul ref={domRef} className="ob-symlist list-unstyled text-nowrap">
             {props.syms.map((sym, id) => {
                 if (props.filter(sym)) {
-                    let extra = null;
+                    let className = "";
                     if (props.entity?.type == "sym" && props.entity.id == id) {
-                        extra = { className: "ob-symlist-selected", ref: selectedElt };
+                        className = "ob-symlist-selected";
                     }
-                    // TODO: Memoize the onClick handler.
                     let info;
                     if (sym.kind === 'U') {
                         // Undefined symbol. Value is not meaningful.
@@ -281,7 +289,9 @@ const SymList = React.memo(function SymList(props: SymListProps) {
                     } else {
                         info = `${sym.kind} ${sym.value.toString(16)}`;
                     }
-                    return <li key={id} onClick={() => props.onSelect({ type: "sym", id: id })} {...extra}><div><span className="ob-symlist-addr">{info}</span> {sym.name}</div></li>;
+                    return (<li key={id} onClick={onClick} data-id={id} className={className}>
+                        <div><span className="ob-symlist-addr">{info}</span> {sym.name}</div>
+                    </li>);
                 }
             })}
         </ul >
