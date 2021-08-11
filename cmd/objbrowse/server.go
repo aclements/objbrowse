@@ -121,6 +121,7 @@ func (s *server) serveIndex(w http.ResponseWriter, req *http.Request) {
 	var kinds strings.Builder
 	js.Syms.Views = make([]int, n)
 	for i, sym := range syms {
+		// TODO: Option to demangle C++ names (and maybe Go names)
 		js.Syms.Names[i] = sym.Name
 		js.Syms.Values[i] = AddrJS(sym.Value)
 		js.Syms.Sizes[i] = sym.Size

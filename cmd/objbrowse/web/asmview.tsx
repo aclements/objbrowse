@@ -23,6 +23,21 @@ type control = { Type: string, Conditional: boolean, TargetPC?: string }
 // innermost function name of each instruction may be particularly
 // valuable.
 
+// TODO: Maybe there should be a more stateful way to navigate control
+// flow. We could keep breadcrumbs for each branch/call you click on,
+// and a return could even use this. It's nice to be able to see the
+// assembly both before and after a branch together, so we could do
+// something where we rearrange the instruction stream as you click on
+// branches so the target immediately follows the branch (with some
+// indication that we've done this). Maybe do instruction rearranging
+// within a function a breadcrumbs across functions.
+
+// TODO: Possible overlays: liveness, DWARF info for variables (might be
+// better as an operand annotation that only appears for a selected
+// operand), profiling info, data flow/aliasing (might be better as an
+// operand annotation), extra information for resolved symbols (Go
+// string or func object contents, offsets in global structures).
+
 function AsmViewer(props: ViewProps) {
     // Fetch data.
     const fetch = useFetchJSON(`/sym/${props.value.entity.id}/asm`)
