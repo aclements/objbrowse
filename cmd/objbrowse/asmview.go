@@ -60,7 +60,7 @@ type instJSON struct {
 type controlJSON struct {
 	Type        string
 	Conditional bool
-	TargetPC    AddrJS `json:",omitempty"`
+	TargetPC    *AddrJS `json:",omitempty"`
 }
 
 type symRefJSON struct {
@@ -138,7 +138,10 @@ func (v *AsmView) View(entity interface{}) http.HandlerFunc {
 				disasm.controlStore = controlJSON{
 					Type:        control.Type.String()[len("Control"):],
 					Conditional: control.Conditional,
-					TargetPC:    AddrJS(control.TargetPC),
+				}
+				if control.TargetPC != ^uint64(0) {
+					pc := AddrJS(control.TargetPC)
+					disasm.Control.TargetPC = &pc
 				}
 			}
 
