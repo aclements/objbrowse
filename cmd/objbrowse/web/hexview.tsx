@@ -6,7 +6,7 @@
 
 import React from "react";
 
-import { ViewProps } from "./objbrowse";
+import { ViewProps, ViewScroller } from "./objbrowse";
 import { FetchJSON } from "./hooks";
 import { Ranges } from "./ranges";
 
@@ -16,7 +16,10 @@ type json = { Addr: string, Data: string }
 
 function HexViewer(props: ViewProps) {
     return (<FetchJSON url={`/sym/${props.value.entity.id}/hex`}>
-        {v => <HexViewer1 {...props} v={v} />}
+        {v =>
+            <ViewScroller value={props.value}>
+                <HexViewer1 {...props} v={v} />
+            </ViewScroller>}
     </FetchJSON>);
 }
 

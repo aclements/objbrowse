@@ -6,7 +6,7 @@
 
 import React, { useState, useRef, useMemo } from "react";
 
-import { ViewProps, Entity, Selection } from "./objbrowse";
+import { ViewProps, Entity, Selection, ViewScroller } from "./objbrowse";
 import { FetchJSON } from "./hooks";
 import { Ranges } from "./ranges";
 import * as History from "./history";
@@ -40,7 +40,10 @@ type control = { Type: string, Conditional: boolean, TargetPC?: string }
 
 function AsmViewer(props: ViewProps) {
     return (<FetchJSON url={`/sym/${props.value.entity.id}/asm`}>
-        {v => <AsmViewer1 {...props} v={v} />}
+        {v =>
+            <ViewScroller value={props.value}>
+                <AsmViewer1 {...props} v={v} />
+            </ViewScroller>}
     </FetchJSON>);
 }
 

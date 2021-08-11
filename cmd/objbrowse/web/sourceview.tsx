@@ -6,7 +6,7 @@
 
 import React, { useMemo } from "react";
 
-import { ViewProps } from "./objbrowse";
+import { ViewProps, ViewScroller } from "./objbrowse";
 import { FetchJSON } from "./hooks";
 import { Ranges } from "./ranges";
 
@@ -17,7 +17,10 @@ type block = { Path: string, Func: string, Start: number, Text: string[], PCs: s
 
 function SourceViewer(props: ViewProps) {
     return (<FetchJSON url={`/sym/${props.value.entity.id}/source`}>
-        {v => <SourceViewer1 {...props} v={v} />}
+        {v =>
+            <ViewScroller value={props.value}>
+                <SourceViewer1 {...props} v={v} />
+            </ViewScroller>}
     </FetchJSON>);
 }
 

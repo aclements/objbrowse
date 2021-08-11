@@ -400,10 +400,17 @@ const EntityColumn = React.memo(function EntityColumn(props: EntityColumnProps) 
             </nav>
             {/* The outer div fills the space */}
             <div>
-                {props.views.map((view) =>
-                    <EntityView key={view.id}
-                        view={view} current={view.id == viewID} value={props.value}
-                        onSelect={props.onSelect} onSelectRange={onSelectRange} />
+                {props.views.map(View =>
+                    // The ob-entity-view div controls visibility and creates a separate
+                    // scroll region this view. We use visibility with absolute
+                    // positioning instead of just display:none because we can't scroll
+                    // the contents of a display:none block.
+                    <div key={View.id} className="ob-entity-view" style={{ visibility: View.id == viewID ? "visible" : "hidden" }}>
+                        {/* The inner div creates padding within the scroll region */}
+                        <div className="p-3">
+                            <View.element value={props.value} onSelect={props.onSelect} onSelectRange={onSelectRange}></View.element>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
@@ -423,16 +430,7 @@ function EntityNavButton(props: { type: "close" | "add", title?: string, onClick
     return <span role="button" className="ob-entity-nav-button" title={props.title}>{svg}</span>;
 }
 
-interface EntityViewProps extends ViewProps {
-    view: View;
-    current: boolean;
-}
-
-/**
- * EntityView displays a single view of an entity. It implements common
- * functionality across all views, including scrolling to the selection.
- */
-function EntityView(props: EntityViewProps) {
+export function ViewScroller(props: { value: Selection, children: React.ReactChild }) {
     const domRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         // Scroll the current selection into view.
@@ -444,26 +442,17 @@ function EntityView(props: EntityViewProps) {
         // scrollTo doesn't have this problem, and gives us the
         // opportunity to scroll the whole selection into view and apply
         // a bit of custom logic.
-        const parent = domRef.current;
+        let parent: (HTMLElement | null) = domRef.current;
+        // Find the ob-entity-view, which is the scrollable container.
+        while (parent !== null && !parent.classList.contains("ob-entity-view")) {
+            parent = parent.parentElement;
+        }
         if (parent !== null) {
             const selection = parent.querySelectorAll(".ob-selected");
             scrollToAll(parent, selection);
         }
     }, [props.value]);
-
-    const View = props.view;
-    // The ob-entity-view div controls visibility and creates a separate
-    // scroll region this view. We use visibility with absolute
-    // positioning instead of just display:none because we can't scroll
-    // the contents of a display:none block.
-    return (
-        <div ref={domRef} className="ob-entity-view" style={{ visibility: props.current ? "visible" : "hidden" }}>
-            {/* The inner div creates padding within the scroll region */}
-            <div className="p-3">
-                <View.element value={props.value} onSelect={props.onSelect} onSelectRange={props.onSelectRange}></View.element>
-            </div>
-        </div>
-    );
+    return <div ref={domRef}>{props.children}</div>;
 }
 
 function scrollToAll(parent: Element, list: NodeListOf<Element>) {
