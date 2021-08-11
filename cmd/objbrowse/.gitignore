@@ -1,0 +1,8 @@
+/objbrowse
+
+# node_modules can be reconstructed by "npm install"
+/node_modules/
+# Ignore webpack's development-mode output tree, since that's rebuilt by
+# objbrowse. We do commit the production-mode tree, since that's baked in by
+# go:embed.
+/web/dist-dev/

@@ -1,0 +1,141 @@
+::-webkit-scrollbar {
+    width: .5rem;
+    height: .5rem;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgba(127,127,127,0.5);
+    border-radius: .25rem;
+}
+
+::-webkit-scrollbar-thumb:vertical {
+    min-height: 30px;
+}
+
+::-webkit-scrollbar-thumb:horizontal {
+    min-width: 30px;
+}
+
+.ob-root {
+    display: flex;
+    flex-wrap: nowrap;
+    height: 100vh;
+    height: -webkit-fill-available;
+    overflow-x: auto;
+    overflow-y: hidden;
+
+    --ob-addr-color: #6c757d; /* .text-muted */
+    --ob-addr-inverted-color: #d0c8c1;
+}
+
+.ob-sympanel {
+    position: sticky; /* TODO: Necessary? */
+    overflow: scroll;  /* Show scrollbars */
+    overflow: overlay; /* Webkit: show content under scrollbars */
+    height: 100vh;
+    border-right: 1px solid #ccc;
+}
+
+.ob-sympanel input {
+    width: 100%;
+}
+
+.ob-symlist {
+    /* Expand to the width of the widest element (some symbols are very long). */
+    display: inline-block;
+    /* But for the click zone and highlighting, make sure it's at least the full width. */
+    min-width: 100%;
+}
+
+.ob-symlist > li {
+    cursor: pointer;
+    /* We add the padding at the li level so we can use scrollIntoView
+     * without triggering horizontal scrolling. */
+    padding-left: 0.75rem;
+}
+
+/* Apply highlighting to the div within the li. */
+.ob-symlist > li > div {
+    border-left: 0.5rem solid transparent;
+    border-radius: 1rem 0 0 1rem;
+}
+
+.ob-symlist > li:hover > div {
+    background-color: rgba(127,127,127,0.5);
+}
+
+.ob-symlist-addr {
+    color: var(--ob-addr-color);
+}
+
+.ob-symlist-selected > div {
+    background-color: var(--bs-primary) !important; /* Override :hover */
+    color: white;
+}
+
+.ob-symlist-selected .ob-symlist-addr {
+    color: var(--ob-addr-inverted-color);
+}
+
+.ob-entity-container {
+    display: flex;
+}
+
+.ob-entity-panel {
+    flex-grow: 1; /* Fill ob-entity-container */
+    height: 100vh;
+    display: flex;
+    flex-flow: column;
+}
+
+.ob-entity-panel + .ob-entity-panel {
+    border-left: 1px solid #ccc;
+}
+
+.ob-entity-panel > nav {
+    flex: 0 1 auto;
+}
+
+.ob-entity-panel > nav .nav-link {
+    cursor: pointer;
+}
+
+.ob-entity-panel-buttons {
+    flex-grow: 1; /* Fill the remaining nav space */
+    padding-right: 1rem; /* Match nav-link right padding */
+    display: flex;
+    justify-content: flex-end; /* Move buttons to the right */
+    align-items: center; /* Center buttons vertically */
+}
+
+.ob-entity-nav-button > svg:hover {
+    background: rgba(127,127,127,0.5);
+    border-radius: 1rem;
+    cursor: pointer;
+}
+
+.ob-entity-panel > div {
+    /* Expand to the rest of the space */
+    flex: 1 1 auto;
+    /* ... without overflowing it. */
+    overflow: hidden;
+    /* Allow view children to overlap */
+    position: relative;
+}
+
+.ob-entity-panel > div > .ob-entity-view {
+    /* The views overlap within the panel so we can use visibility to hide and show them. */
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: scroll;
+    overflow: overlay; /* Webkit: show content under scrollbars */
+}
+
+.ob-selected {
+    background: #b4d2ff;
+}

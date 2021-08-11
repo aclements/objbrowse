@@ -1,0 +1,31 @@
+/** @license ObjBrowse
+ * Copyright 2021 The Go Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+
+ .hv-table {
+    table-layout: fixed;
+    white-space: pre;
+    font-family: var(--bs-font-monospace);
+    position: relative; /* For sticky header */
+}
+
+.hv-table th {
+    color: var(--ob-addr-color);
+    font-weight: inherit;
+    position: sticky;
+    top: 0;
+    background: white; /* Cover rows when this sticks over them */
+}
+
+.hv-addr {
+    color: var(--ob-addr-color);
+    text-align: right;
+    user-select: none;
+}
+
+.hv-table td, .hv-table th {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
