@@ -230,11 +230,33 @@ function SymPanel(props: SymPanelProps) {
         }
     }
 
+    // Make "/" jump to the search box.
+    const inputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        function onkeydown(e: KeyboardEvent) {
+            // Don't intercept keys on input elements.
+            if (e.target instanceof Element &&
+                (/input|select|textarea/i.test(e.target.nodeName))) {
+                return;
+            }
+            if (e.key == "/") {
+                if (inputRef.current !== null) {
+                    inputRef.current.focus();
+                    inputRef.current.select();
+                    // Avoid typing "/" into the input.
+                    e.preventDefault();
+                }
+            }
+        }
+        window.addEventListener("keydown", onkeydown);
+        return () => { window.removeEventListener("keydown", onkeydown); };
+    });
+
     // TODO: Filter by symbol type?
 
     return (<div className="ob-sympanel bg-light">
         <div className="m-3">
-            <input value={filterStr} onChange={(ev) => handleChange(ev.target.value)} placeholder="Name regexp or hex address" className={isError ? "bg-warning" : ""}></input>
+            <input ref={inputRef} value={filterStr} onChange={(ev) => handleChange(ev.target.value)} placeholder="Name regexp or hex address [/]" className={isError ? "bg-warning" : ""} />
         </div>
         {
             // Don't add left or right margin. The SymList rows add their own.
