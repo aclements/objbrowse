@@ -113,11 +113,10 @@ func (v *AsmView) View(entity interface{}) http.HandlerFunc {
 		for i := 0; i < insts.Len(); i++ {
 			inst := insts.Get(i)
 			// TODO: Often the address lookups are for type.*,
-			// go.string.*, or go.func.*. These are pretty useless. We
-			// should at least link to the right place in a hex dump. It
-			// would be way better if we could do something like
-			// printing the string or resolving the pointer in the
-			// funcval.
+			// go.string.*, or go.func.*. These are pretty useless. It
+			// would be nice if we could do something like printing the
+			// string (or the first N bytes of it, since we don't know
+			// the length) or resolving the pointer in the funcval.
 			//
 			// If there's a relocation here, we might need to follow it
 			// to the target. I'm not sure how to do that. I might just

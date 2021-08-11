@@ -7,8 +7,8 @@
 import React, { useState, useRef, useMemo } from "react";
 
 import { ViewProps, Entity, Selection } from "./objbrowse";
-import { useFetchJSON } from "./hooks";
-import { Ranges, Range } from "./ranges";
+import { FetchJSON } from "./hooks";
+import { Ranges } from "./ranges";
 import * as History from "./history";
 
 import "./asmview.css";
@@ -39,20 +39,12 @@ type control = { Type: string, Conditional: boolean, TargetPC?: string }
 // string or func object contents, offsets in global structures).
 
 function AsmViewer(props: ViewProps) {
-    // Fetch data.
-    const fetch = useFetchJSON(`/sym/${props.value.entity.id}/asm`)
-    if (fetch.pending) {
-        return fetch.pending;
-    }
-    const v: json = fetch.value;
-    return <AsmViewer1 {...props} v={v} />;
+    return (<FetchJSON url={`/sym/${props.value.entity.id}/asm`}>
+        {v => <AsmViewer1 {...props} v={v} />}
+    </FetchJSON>);
 }
 
-interface AsmViewer1Props extends ViewProps {
-    v: json;
-}
-
-function AsmViewer1(props: AsmViewer1Props) {
+function AsmViewer1(props: ViewProps & { v: json }) {
     const v = props.v;
 
     // Parse PCs.

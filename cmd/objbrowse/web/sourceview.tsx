@@ -7,7 +7,7 @@
 import React, { useMemo } from "react";
 
 import { ViewProps } from "./objbrowse";
-import { useFetchJSON } from "./hooks";
+import { FetchJSON } from "./hooks";
 import { Ranges } from "./ranges";
 
 import "./sourceview.css";
@@ -16,12 +16,13 @@ type json = { Blocks: block[] }
 type block = { Path: string, Func: string, Start: number, Text: string[], PCs: string[2][][], Error?: string }
 
 function SourceViewer(props: ViewProps) {
-    // Fetch data.
-    const fetch = useFetchJSON(`/sym/${props.value.entity.id}/source`)
-    if (fetch.pending) {
-        return fetch.pending;
-    }
-    const v: json = fetch.value;
+    return (<FetchJSON url={`/sym/${props.value.entity.id}/source`}>
+        {v => <SourceViewer1 {...props} v={v} />}
+    </FetchJSON>);
+}
+
+function SourceViewer1(props: ViewProps & { v: json }) {
+    const v = props.v;
 
     // Create a table for each source block.
     let blocks = v.Blocks.map((val, blockI) => {

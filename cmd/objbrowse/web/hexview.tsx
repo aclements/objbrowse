@@ -7,7 +7,7 @@
 import React from "react";
 
 import { ViewProps } from "./objbrowse";
-import { useFetchJSON } from "./hooks";
+import { FetchJSON } from "./hooks";
 import { Ranges } from "./ranges";
 
 import "./hexview.css";
@@ -15,16 +15,13 @@ import "./hexview.css";
 type json = { Addr: string, Data: string }
 
 function HexViewer(props: ViewProps) {
-    // Fetch data.
-    const fetch = useFetchJSON(`/sym/${props.value.entity.id}/hex`)
-    if (fetch.pending) {
-        return fetch.pending;
-    }
-    if (typeof fetch.value === "string") {
-        // "No data" Error
-        return <div>{fetch.value}</div>;
-    }
-    const v: json = fetch.value;
+    return (<FetchJSON url={`/sym/${props.value.entity.id}/hex`}>
+        {v => <HexViewer1 {...props} v={v} />}
+    </FetchJSON>);
+}
+
+function HexViewer1(props: ViewProps & { v: json }) {
+    const v = props.v;
 
     // Format column headers.
     let hexHead = "", asciiHead = "";

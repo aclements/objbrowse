@@ -4,7 +4,7 @@
  * license that can be found in the LICENSE file.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactElement } from 'react';
 import "bootstrap/dist/css/bootstrap.min.css"; // For loading spinner and errors.
 
 export type UseFetchJSONResult = { pending: React.ReactElement, error?: string } | { pending: false, value: any }
@@ -72,4 +72,22 @@ export function useFetchJSON(url: string): UseFetchJSONResult {
     }, [url]);
 
     return res;
+}
+
+interface FetchJSONProps {
+    url: string;
+    children: (data: any) => ReactElement;
+}
+
+// FetchJSON is a higher-order component that uses useFetchJSON and
+// renders its child with the fetched data. The child must be a callback
+// that takes the data and returns the component to render.
+export function FetchJSON(props: FetchJSONProps) {
+    const fetch = useFetchJSON(props.url);
+    if (fetch.pending) {
+        // TODO: Maybe the pending and error DOM should move into
+        // FetchJSON?
+        return fetch.pending;
+    }
+    return props.children(fetch.value);
 }
